@@ -164,6 +164,7 @@ func (h *HtlcSucceedInput) CraftInputScript(signer Signer, txn *wire.MsgTx,
 	desc := h.signDesc
 	desc.SigHashes = hashCache
 	desc.InputIndex = txinIdx
+	desc.TxTime = txn.Time;
 
 	witness, err := SenderHtlcSpendRedeem(
 		signer, &desc, txn, h.preimage,

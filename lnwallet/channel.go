@@ -3841,7 +3841,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 				sigHash, err := txscript.CalcWitnessSigHash(
 					htlc.ourWitnessScript, hashCache,
 					txscript.SigHashAll, successTx, 0,
-					int64(htlc.Amount.ToSatoshis()),
+					int64(htlc.Amount.ToSatoshis()), wire.EmptyTokenId[:], 0,
 				)
 				if err != nil {
 					return nil, err
@@ -3896,6 +3896,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 					htlc.ourWitnessScript, hashCache,
 					txscript.SigHashAll, timeoutTx, 0,
 					int64(htlc.Amount.ToSatoshis()),
+					wire.EmptyTokenId[:], 0,
 				)
 				if err != nil {
 					return nil, err
@@ -4074,7 +4075,7 @@ func (lc *LightningChannel) ReceiveNewCommitment(commitSig lnwire.Sig,
 	hashCache := txscript.NewTxSigHashes(localCommitTx)
 	sigHash, err := txscript.CalcWitnessSigHash(
 		multiSigScript, hashCache, txscript.SigHashAll,
-		localCommitTx, 0, int64(lc.channelState.Capacity),
+		localCommitTx, 0, int64(lc.channelState.Capacity), wire.EmptyTokenId[:], 0,
 	)
 	if err != nil {
 		// TODO(roasbeef): fetchview has already mutated the HTLCs...
@@ -5933,7 +5934,7 @@ func (lc *LightningChannel) CompleteCooperativeClose(localSig, remoteSig []byte,
 	// properly met, and that the remote peer supplied a valid signature.
 	prevOut := lc.signDesc.Output
 	vm, err := txscript.NewEngine(prevOut.PkScript, closeTx, 0,
-		txscript.StandardVerifyFlags, nil, hashCache, prevOut.Value)
+		txscript.StandardVerifyFlags, nil, hashCache, prevOut.Value, prevOut.TokenId[:], prevOut.TokenValue)
 	if err != nil {
 		return nil, 0, err
 	}

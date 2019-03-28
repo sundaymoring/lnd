@@ -32,6 +32,9 @@ message TxOut {
 
     /// The script of the output being spent.
     bytes pk_script = 2;
+
+    bytes token_id = 3;
+    int64 token_value = 4;
 }
 
 message SignDescriptor {
@@ -85,6 +88,8 @@ message SignDescriptor {
     The target input within the transaction that should be signed.
     */
     int32 input_index = 8;
+
+    uint32 tx_time = 9;
 }
 
 message SignReq {

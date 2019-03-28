@@ -986,7 +986,7 @@ func (l *LightningWallet) handleFundingCounterPartySigs(msg *addCounterPartySigs
 			// Ensure that the witness+sigScript combo is valid.
 			vm, err := txscript.NewEngine(output.PkScript,
 				fundingTx, i, txscript.StandardVerifyFlags, nil,
-				fundingHashCache, output.Value)
+				fundingHashCache, output.Value, output.TokenId[:], output.TokenValue)
 			if err != nil {
 				msg.err <- fmt.Errorf("cannot create script "+
 					"engine: %s", err)
@@ -1030,7 +1030,7 @@ func (l *LightningWallet) handleFundingCounterPartySigs(msg *addCounterPartySigs
 	channelValue := int64(res.partialState.Capacity)
 	hashCache := txscript.NewTxSigHashes(commitTx)
 	sigHash, err := txscript.CalcWitnessSigHash(witnessScript, hashCache,
-		txscript.SigHashAll, commitTx, 0, channelValue)
+		txscript.SigHashAll, commitTx, 0, channelValue, wire.EmptyTokenId[:], 0)
 	if err != nil {
 		msg.err <- err
 		msg.completeChan <- nil
@@ -1177,7 +1177,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	}
 
 	sigHash, err := txscript.CalcWitnessSigHash(witnessScript, hashCache,
-		txscript.SigHashAll, ourCommitTx, 0, channelValue)
+		txscript.SigHashAll, ourCommitTx, 0, channelValue, wire.EmptyTokenId[:], 0)
 	if err != nil {
 		req.err <- err
 		req.completeChan <- nil

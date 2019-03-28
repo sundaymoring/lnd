@@ -83,6 +83,7 @@ type KeyDescriptor struct {
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
+
 }
 
 func (m *KeyDescriptor) Reset()         { *m = KeyDescriptor{} }
@@ -128,6 +129,10 @@ type TxOut struct {
 	Value int64 `protobuf:"varint,1,opt,name=value,proto3" json:"value,omitempty"`
 	// / The script of the output being spent.
 	PkScript             []byte   `protobuf:"bytes,2,opt,name=pk_script,json=pkScript,proto3" json:"pk_script,omitempty"`
+
+	TokenId              []byte   `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	TokenValue 			 int64 	  `protobuf:"varint,4,opt,name=token_value,json=tokenValue,proto3" json:"token_value,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -171,6 +176,20 @@ func (m *TxOut) GetPkScript() []byte {
 	return nil
 }
 
+func (m *TxOut) GetTokenId() []byte {
+	if m != nil {
+		return m.TokenId
+	}
+	return nil
+}
+
+func (m *TxOut) GetTokenValue() int64 {
+	if m != nil {
+		return m.TokenValue
+	}
+	return 0
+}
+
 type SignDescriptor struct {
 	// *
 	// A descriptor that precisely describes *which* key to use for signing. This
@@ -209,6 +228,7 @@ type SignDescriptor struct {
 	// *
 	// The target input within the transaction that should be signed.
 	InputIndex           int32    `protobuf:"varint,8,opt,name=input_index,json=inputIndex,proto3" json:"input_index,omitempty"`
+	TxTime 				 uint32 	`protobuf:"varint,9,opt,name=tx_time,json=txTime,proto3" json:"tx_time,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -283,6 +303,13 @@ func (m *SignDescriptor) GetSighash() uint32 {
 func (m *SignDescriptor) GetInputIndex() int32 {
 	if m != nil {
 		return m.InputIndex
+	}
+	return 0
+}
+
+func (m *SignDescriptor) GetTxTime() uint32 {
+	if m != nil {
+		return m.TxTime
 	}
 	return 0
 }

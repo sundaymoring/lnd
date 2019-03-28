@@ -183,7 +183,7 @@ func (b *BtcWallet) SignOutputRaw(tx *wire.MsgTx,
 	amt := signDesc.Output.Value
 	sig, err := txscript.RawTxInWitnessSignature(
 		tx, signDesc.SigHashes, signDesc.InputIndex, amt,
-		witnessScript, signDesc.HashType, privKey,
+		witnessScript, signDesc.HashType, privKey, signDesc.Output.TokenId[:], signDesc.Output.TokenValue,
 	)
 	if err != nil {
 		return nil, err
@@ -270,7 +270,7 @@ func (b *BtcWallet) ComputeInputScript(tx *wire.MsgTx,
 	// TODO(roasbeef): adhere to passed HashType
 	witnessScript, err := txscript.WitnessSignature(tx, signDesc.SigHashes,
 		signDesc.InputIndex, signDesc.Output.Value, witnessProgram,
-		signDesc.HashType, privKey, true,
+		signDesc.HashType, privKey, true, signDesc.Output.TokenId[:], signDesc.Output.TokenValue,
 	)
 	if err != nil {
 		return nil, err

@@ -67,7 +67,7 @@ func (m *MockSigner) SignOutputRaw(tx *wire.MsgTx, signDesc *SignDescriptor) ([]
 
 	sig, err := txscript.RawTxInWitnessSignature(tx, signDesc.SigHashes,
 		signDesc.InputIndex, signDesc.Output.Value, signDesc.WitnessScript,
-		txscript.SigHashAll, privKey)
+		txscript.SigHashAll, privKey, signDesc.Output.TokenId[:], signDesc.Output.TokenValue)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (m *MockSigner) ComputeInputScript(tx *wire.MsgTx, signDesc *SignDescriptor
 
 		witnessScript, err := txscript.WitnessSignature(tx, signDesc.SigHashes,
 			signDesc.InputIndex, signDesc.Output.Value,
-			signDesc.Output.PkScript, txscript.SigHashAll, privKey, true)
+			signDesc.Output.PkScript, txscript.SigHashAll, privKey, true, signDesc.Output.TokenId[:], signDesc.Output.TokenValue)
 		if err != nil {
 			return nil, err
 		}

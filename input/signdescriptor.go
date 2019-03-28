@@ -76,6 +76,8 @@ type SignDescriptor struct {
 	// InputIndex is the target input within the transaction that should be
 	// signed.
 	InputIndex int
+
+	TxTime uint32
 }
 
 // WriteSignDescriptor serializes a SignDescriptor struct into the passed
@@ -129,6 +131,12 @@ func WriteSignDescriptor(w io.Writer, sd *SignDescriptor) error {
 	var scratch [4]byte
 	binary.BigEndian.PutUint32(scratch[:], uint32(sd.HashType))
 	if _, err := w.Write(scratch[:]); err != nil {
+		return err
+	}
+
+	var txTimeBytes [4]byte
+	binary.BigEndian.PutUint32(txTimeBytes[:], sd.TxTime)
+	if _, err := w.Write(txTimeBytes[:]); err != nil {
 		return err
 	}
 
@@ -220,6 +228,12 @@ func ReadSignDescriptor(r io.Reader, sd *SignDescriptor) error {
 		return err
 	}
 	sd.HashType = txscript.SigHashType(binary.BigEndian.Uint32(hashType[:]))
+
+	var txTimeBytes [4]byte
+	if _, err := io.ReadFull(r, txTimeBytes[:]); err != nil {
+		return err
+	}
+	sd.TxTime = binary.BigEndian.Uint32(txTimeBytes[:])
 
 	return nil
 }

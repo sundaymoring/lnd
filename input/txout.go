@@ -20,6 +20,16 @@ func writeTxOut(w io.Writer, txo *wire.TxOut) error {
 		return err
 	}
 
+	if err := wire.WriteVarBytes(w, 0, txo.TokenId[:]); err != nil {
+		return err
+	}
+
+	var tokkenAmount [8]byte
+	binary.BigEndian.PutUint64(tokkenAmount[:], uint64(txo.TokenValue))
+	if _, err := w.Write(tokkenAmount[:]); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -37,10 +47,24 @@ func readTxOut(r io.Reader, txo *wire.TxOut) error {
 		return err
 	}
 
+	tokenId, err := wire.ReadVarBytes(r, 0, 80, "tokenValue")
+	if err != nil {
+		return err
+	}
+
+	var tokenAmountBytes [8]byte
+
+	if _, err := io.ReadFull(r, tokenAmountBytes[:]); err != nil {
+		return err
+	}
+	tokenAmount := int64(binary.BigEndian.Uint64(tokenAmountBytes[:]))
+
 	*txo = wire.TxOut{
 		Value:    value,
 		PkScript: pkScript,
+		TokenValue: tokenAmount,
 	}
+	txo.TokenId.SetBytes(tokenId)
 
 	return nil
 }

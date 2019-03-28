@@ -284,6 +284,7 @@ func (s *Server) SignOutputRaw(ctx context.Context, in *SignReq) (*SignResp, err
 			HashType:   txscript.SigHashType(signDesc.Sighash),
 			SigHashes:  sigHashCache,
 			InputIndex: int(signDesc.InputIndex),
+			TxTime:		signDesc.TxTime,
 		})
 	}
 
@@ -354,9 +355,12 @@ func (s *Server) ComputeInputScript(ctx context.Context,
 			Output: &wire.TxOut{
 				Value:    signDesc.Output.Value,
 				PkScript: signDesc.Output.PkScript,
+				TokenId:  signDesc.Output.TokenId,
+				TokenValue:signDesc.Output.TokenValue,
 			},
 			HashType:  txscript.SigHashType(signDesc.Sighash),
 			SigHashes: sigHashCache,
+			TxTime:    signDesc.TxTime,
 		})
 	}
 
