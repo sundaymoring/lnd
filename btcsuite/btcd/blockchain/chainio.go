@@ -251,6 +251,9 @@ type SpentTxOut struct {
 
 	// Denotes if the creating tx is a coinbase.
 	IsCoinBase bool
+
+	TokenId		wire.TokenId
+	TokenAmount int64
 }
 
 // FetchSpendJournal attempts to retrieve the spend journal, or the set of
@@ -301,7 +304,7 @@ func spentTxOutSerializeSize(stxo *SpentTxOut) int {
 		// so this is required for backwards compat.
 		size += serializeSizeVLQ(0)
 	}
-	return size + compressedTxOutSize(uint64(stxo.Amount), stxo.PkScript)
+	return size + compressedTxOutSize(uint64(stxo.Amount), stxo.PkScript, stxo.TokenId[:], uint64(stxo.TokenAmount))
 }
 
 // putSpentTxOut serializes the passed stxo according to the format described
@@ -318,7 +321,7 @@ func putSpentTxOut(target []byte, stxo *SpentTxOut) int {
 		offset += putVLQ(target[offset:], 0)
 	}
 	return offset + putCompressedTxOut(target[offset:], uint64(stxo.Amount),
-		stxo.PkScript)
+		stxo.PkScript, stxo.TokenId[:], uint64(stxo.TokenAmount))
 }
 
 // decodeSpentTxOut decodes the passed serialized stxo entry, possibly followed
@@ -356,7 +359,7 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	}
 
 	// Decode the compressed txout.
-	amount, pkScript, bytesRead, err := decodeCompressedTxOut(
+	amount, pkScript, tokenId, tokenAmount, bytesRead, err := decodeCompressedTxOut(
 		serialized[offset:])
 	offset += bytesRead
 	if err != nil {
@@ -365,6 +368,8 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	}
 	stxo.Amount = int64(amount)
 	stxo.PkScript = pkScript
+	stxo.TokenId.SetBytes(tokenId)
+	stxo.TokenAmount = int64(tokenAmount)
 	return offset, nil
 }
 
@@ -643,14 +648,14 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 
 	// Calculate the size needed to serialize the entry.
 	size := serializeSizeVLQ(headerCode) +
-		compressedTxOutSize(uint64(entry.Amount()), entry.PkScript())
+		compressedTxOutSize(uint64(entry.Amount()), entry.PkScript(), entry.TokenId(), uint64(entry.TokenAmount()))
 
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	serialized := make([]byte, size)
 	offset := putVLQ(serialized, headerCode)
 	offset += putCompressedTxOut(serialized[offset:], uint64(entry.Amount()),
-		entry.PkScript())
+		entry.PkScript(), entry.TokenId(), uint64(entry.TokenAmount()))
 
 	return serialized, nil
 }
@@ -673,7 +678,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	blockHeight := int32(code >> 1)
 
 	// Decode the compressed unspent transaction output.
-	amount, pkScript, _, err := decodeCompressedTxOut(serialized[offset:])
+	amount, pkScript, tokenId, tokenAmount, _, err := decodeCompressedTxOut(serialized[offset:])
 	if err != nil {
 		return nil, errDeserialize(fmt.Sprintf("unable to decode "+
 			"utxo: %v", err))
@@ -684,7 +689,9 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 		pkScript:    pkScript,
 		blockHeight: blockHeight,
 		packedFlags: 0,
+		tokenAmount: int64(tokenAmount),
 	}
+	entry.tokenId.SetBytes(tokenId)
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}

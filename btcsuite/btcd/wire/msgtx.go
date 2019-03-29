@@ -7,10 +7,9 @@ package wire
 import (
 	"bytes"
 	"fmt"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"io"
 	"strconv"
-
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -108,6 +107,31 @@ const (
 	// than 10k bytes.
 	maxWitnessItemSize = 11000
 )
+
+const TokenIdSize = 36
+type TokenId [TokenIdSize]byte
+var EmptyTokenId = TokenId{}
+
+func (tokenId *TokenId) SetBytes(newTokenId []byte) error {
+	nhlen := len(newTokenId)
+	if nhlen != TokenIdSize {
+		return fmt.Errorf("invalid token id length of %v, want %v", nhlen,
+			TokenIdSize)
+	}
+	copy(tokenId[:], newTokenId)
+
+	return nil
+}
+
+func (tokenId *TokenId) IsEqual(target *TokenId) bool {
+	if tokenId == nil && target == nil {
+		return true
+	}
+	if tokenId == nil || target == nil {
+		return false
+	}
+	return *tokenId == *target
+}
 
 // witnessMarkerBytes are a pair of bytes specific to the witness encoding. If
 // this sequence is encoutered, then it indicates a transaction has iwtness
@@ -263,7 +287,7 @@ type TxOut struct {
 	PkScript []byte
 
 	// Token Field
-	TokenId	 [36]byte
+	TokenId	 TokenId
 	TokenValue int64
 }
 
@@ -272,7 +296,7 @@ type TxOut struct {
 func (t *TxOut) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of PkScript +
 	// PkScript bytes.
-	return 8 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
+	return 8 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript) + VarIntSerializeSize(uint64(len(t.TokenId))) + len(t.TokenId) + 8
 }
 
 // NewTxOut returns a new bitcoin transaction output with the provided
@@ -391,7 +415,6 @@ func (msg *MsgTx) Copy() *MsgTx {
 	for _, oldTxOut := range msg.TxOut {
 		// Deep copy the old PkScript
 		var newScript []byte
-		var newTokenId [36]byte
 		oldScript := oldTxOut.PkScript
 		oldScriptLen := len(oldScript)
 		if oldScriptLen > 0 {
@@ -399,17 +422,15 @@ func (msg *MsgTx) Copy() *MsgTx {
 			copy(newScript, oldScript[:oldScriptLen])
 		}
 
-		copy(newTokenId[:], oldTxOut.TokenId[:])
-
 		// Create new txOut with the deep copied data and append it to
 		// new Tx.
 		newTxOut := TxOut{
 			Value:    oldTxOut.Value,
 			PkScript: newScript,
-
-			TokenId: newTokenId,
 			TokenValue:oldTxOut.TokenValue,
 		}
+		copy(newTxOut.TokenId[:], oldTxOut.TokenId[:])
+
 		newTx.TxOut = append(newTx.TxOut, &newTxOut)
 	}
 
@@ -426,7 +447,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		return err
 	}
 	msg.Version = int32(version)
-
 
 	if msg.Time, err = binarySerializer.Uint32(r, littleEndian); err != nil {
 		return err
@@ -808,9 +828,9 @@ func (msg *MsgTx) SerializeNoWitness(w io.Writer) error {
 // baseSize returns the serialized size of the transaction without accounting
 // for any witness data.
 func (msg *MsgTx) baseSize() int {
-	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
+	// Version 4 bytes + TxTime 4 bytes + LockTime 4 bytes + Serialized varint size for the
 	// number of transaction inputs and outputs.
-	n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+	n := 12 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
 		VarIntSerializeSize(uint64(len(msg.TxOut)))
 
 	for _, txIn := range msg.TxIn {
@@ -897,7 +917,7 @@ func (msg *MsgTx) PkScriptLocs() []int {
 		//
 		// Value 8 bytes + serialized varint size for the length of
 		// PkScript.
-		n += 8 + VarIntSerializeSize(uint64(len(txOut.PkScript)))
+		n += 8 + VarIntSerializeSize(uint64(len(txOut.PkScript))) + 8 + VarIntSerializeSize(uint64(len(txOut.TokenId)))
 		pkScriptLocs[i] = n
 		n += len(txOut.PkScript)
 	}

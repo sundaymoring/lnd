@@ -271,7 +271,7 @@ func validateMsgTx(tx *wire.MsgTx, prevScripts [][]byte, inputValues []btcutil.A
 	hashCache := txscript.NewTxSigHashes(tx)
 	for i, prevScript := range prevScripts {
 		vm, err := txscript.NewEngine(prevScript, tx, i,
-			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i]))
+			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i]), wire.EmptyTokenId[:], 0)
 		if err != nil {
 			return fmt.Errorf("cannot create script engine: %s", err)
 		}

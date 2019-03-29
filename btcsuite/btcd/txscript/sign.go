@@ -20,7 +20,7 @@ import (
 // signs a new sighash digest defined in BIP0143.
 func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 	amt int64, subScript []byte, hashType SigHashType,
-	key *btcec.PrivateKey) ([]byte, error) {
+	key *btcec.PrivateKey, tokenId []byte, tokenAmount int64) ([]byte, error) {
 
 	parsedScript, err := parseScript(subScript)
 	if err != nil {
@@ -28,7 +28,7 @@ func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 	}
 
 	hash, err := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
-		idx, amt)
+		idx, amt, tokenId, tokenAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -48,10 +48,10 @@ func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 // transaction digest algorithm defined within BIP0143.
 func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
 	subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey,
-	compress bool) (wire.TxWitness, error) {
+	compress bool, tokenId []byte, tokenAmount int64) (wire.TxWitness, error) {
 
 	sig, err := RawTxInWitnessSignature(tx, sigHashes, idx, amt, subscript,
-		hashType, privKey)
+		hashType, privKey, tokenId, tokenAmount)
 	if err != nil {
 		return nil, err
 	}

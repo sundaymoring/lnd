@@ -136,6 +136,9 @@ type Engine struct {
 	witnessVersion  int
 	witnessProgram  []byte
 	inputAmount     int64
+
+	tokenId			wire.TokenId
+	tokenAmount		int64
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
@@ -853,7 +856,8 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
 func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
-	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64) (*Engine, error) {
+	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64,
+	tokenId []byte, tokenAmount int64) (*Engine, error) {
 
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {
@@ -883,7 +887,8 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// when it should be. The same goes for segwit which will pull in
 	// additional scripts for execution from the witness stack.
 	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
-		inputAmount: inputAmount}
+		inputAmount: inputAmount, tokenAmount: tokenAmount}
+
 	if vm.hasFlag(ScriptVerifyCleanStack) && (!vm.hasFlag(ScriptBip16) &&
 		!vm.hasFlag(ScriptVerifyWitness)) {
 		return nil, scriptError(ErrInvalidFlags,
@@ -999,6 +1004,9 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 
 	vm.tx = *tx
 	vm.txIdx = txIdx
+	if err := vm.tokenId.SetBytes(tokenId); err != nil {
+		return nil, err
+	}
 
 	return &vm, nil
 }

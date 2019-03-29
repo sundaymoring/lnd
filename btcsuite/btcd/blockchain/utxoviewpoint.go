@@ -50,6 +50,9 @@ type UtxoEntry struct {
 	// since it was loaded.  This approach is used in order to reduce memory
 	// usage since there will be a lot of these in memory.
 	packedFlags txoFlags
+
+	tokenId		wire.TokenId
+	tokenAmount int64
 }
 
 // isModified returns whether or not the output has been modified since it was
@@ -97,6 +100,14 @@ func (entry *UtxoEntry) PkScript() []byte {
 	return entry.pkScript
 }
 
+func (entry *UtxoEntry) TokenId() []byte {
+	return entry.tokenId[:]
+}
+
+func (entry *UtxoEntry) TokenAmount() int64 {
+	return entry.tokenAmount
+}
+
 // Clone returns a shallow copy of the utxo entry.
 func (entry *UtxoEntry) Clone() *UtxoEntry {
 	if entry == nil {
@@ -108,6 +119,8 @@ func (entry *UtxoEntry) Clone() *UtxoEntry {
 		pkScript:    entry.pkScript,
 		blockHeight: entry.blockHeight,
 		packedFlags: entry.packedFlags,
+		tokenId:	 entry.tokenId,
+		tokenAmount: entry.tokenAmount,
 	}
 }
 
@@ -147,7 +160,7 @@ func (view *UtxoViewpoint) LookupEntry(outpoint wire.OutPoint) *UtxoEntry {
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, isCoinBase bool, blockHeight int32) {
+func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, isCoinBase bool, blockHeight int32, txTime uint32) {
 	// Don't add provably unspendable outputs.
 	if txscript.IsUnspendable(txOut.PkScript) {
 		return
@@ -170,6 +183,9 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}
+
+	entry.tokenId = txOut.TokenId
+	entry.tokenAmount = txOut.TokenValue
 }
 
 // AddTxOut adds the specified output of the passed transaction to the view if
@@ -188,7 +204,7 @@ func (view *UtxoViewpoint) AddTxOut(tx *btcutil.Tx, txOutIdx uint32, blockHeight
 	// is allowed so long as the previous transaction is fully spent.
 	prevOut := wire.OutPoint{Hash: *tx.Hash(), Index: txOutIdx}
 	txOut := tx.MsgTx().TxOut[txOutIdx]
-	view.addTxOut(prevOut, txOut, IsCoinBase(tx), blockHeight)
+	view.addTxOut(prevOut, txOut, IsCoinBase(tx), blockHeight, tx.MsgTx().Time)
 }
 
 // AddTxOuts adds all outputs in the passed transaction which are not provably
@@ -207,7 +223,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 		// same hash.  This is allowed so long as the previous
 		// transaction is fully spent.
 		prevOut.Index = uint32(txOutIdx)
-		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight)
+		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight, tx.MsgTx().Time)
 	}
 }
 
@@ -244,7 +260,11 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 				PkScript:   entry.PkScript(),
 				Height:     entry.BlockHeight(),
 				IsCoinBase: entry.IsCoinBase(),
+
+				TokenAmount:entry.TokenAmount(),
 			}
+
+			stxo.TokenId.SetBytes(entry.TokenId())
 			*stxos = append(*stxos, stxo)
 		}
 
@@ -356,6 +376,9 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 					pkScript:    txOut.PkScript,
 					blockHeight: block.Height(),
 					packedFlags: packedFlags,
+
+					tokenId:	 txOut.TokenId,
+					tokenAmount: txOut.TokenValue,
 				}
 
 				view.entries[prevOut] = entry
@@ -429,6 +452,9 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 			if stxo.IsCoinBase {
 				entry.packedFlags |= tfCoinBase
 			}
+
+			entry.tokenId.SetBytes(stxo.TokenId[:])
+			entry.tokenAmount = stxo.TokenAmount
 		}
 	}
 

@@ -76,7 +76,7 @@ out:
 			inputAmount := utxo.Amount()
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
 				txVI.txInIndex, v.flags, v.sigCache, txVI.sigHashes,
-				inputAmount)
+				inputAmount, utxo.TokenId(), utxo.TokenAmount())
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %v - "+

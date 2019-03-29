@@ -436,7 +436,7 @@ func calcHashOutputs(tx *wire.MsgTx) chainhash.Hash {
 // wallet if fed an invalid input amount, the real sighash will differ causing
 // the produced signature to be invalid.
 func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
-	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
+	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64, tokenId []byte, tokenAmount int64) ([]byte, error) {
 
 	// As a sanity check, ensure the passed input index for the transaction
 	// is valid.
@@ -452,6 +452,10 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	var bVersion [4]byte
 	binary.LittleEndian.PutUint32(bVersion[:], uint32(tx.Version))
 	sigHash.Write(bVersion[:])
+
+	var bTxTime [4]byte
+	binary.LittleEndian.PutUint32(bTxTime[:], uint32(tx.Time))
+	sigHash.Write(bTxTime[:])
 
 	// Next write out the possibly pre-calculated hashes for the sequence
 	// numbers of all inputs, and the hashes of the previous outs for all
@@ -509,6 +513,13 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	var bAmount [8]byte
 	binary.LittleEndian.PutUint64(bAmount[:], uint64(amt))
 	sigHash.Write(bAmount[:])
+
+	sigHash.Write(tokenId[:])
+
+	var bTokenAmount [8]byte
+	binary.LittleEndian.PutUint64(bTokenAmount[:], uint64(tokenAmount))
+	sigHash.Write(bTokenAmount[:])
+
 	var bSequence [4]byte
 	binary.LittleEndian.PutUint32(bSequence[:], txIn.Sequence)
 	sigHash.Write(bSequence[:])
@@ -543,7 +554,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 // CalcWitnessSigHash computes the sighash digest for the specified input of
 // the target transaction observing the desired sig hash type.
 func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType,
-	tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
+	tx *wire.MsgTx, idx int, amt int64, tokenId []byte, tokenAmount int64) ([]byte, error) {
 
 	parsedScript, err := parseScript(script)
 	if err != nil {
@@ -551,7 +562,7 @@ func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType
 	}
 
 	return calcWitnessSignatureHash(parsedScript, sigHashes, hType, tx, idx,
-		amt)
+		amt, tokenId, tokenAmount)
 }
 
 // shallowCopyTx creates a shallow copy of the transaction for use when
@@ -657,6 +668,9 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 		for i := 0; i < idx; i++ {
 			txCopy.TxOut[i].Value = -1
 			txCopy.TxOut[i].PkScript = nil
+
+			txCopy.TxOut[i].TokenValue = -1
+			txCopy.TxOut[i].TokenId = wire.TokenId{}
 		}
 
 		// Sequence on all other inputs is 0, too.

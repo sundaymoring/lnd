@@ -280,7 +280,7 @@ func spendWitnessKeyHash(txIn *wire.TxIn, pkScript []byte,
 		return err
 	}
 	witnessScript, err := txscript.WitnessSignature(tx, hashCache, idx,
-		inputValue, witnessProgram, txscript.SigHashAll, privKey, true)
+		inputValue, witnessProgram, txscript.SigHashAll, privKey, true, wire.EmptyTokenId[:], 0)
 	if err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ func spendNestedWitnessPubKeyHash(txIn *wire.TxIn, pkScript []byte,
 	// With the sigScript in place, we'll next generate the proper witness
 	// that'll allow us to spend the p2wkh output.
 	witnessScript, err := txscript.WitnessSignature(tx, hashCache, idx,
-		inputValue, witnessProgram, txscript.SigHashAll, privKey, compressed)
+		inputValue, witnessProgram, txscript.SigHashAll, privKey, compressed, wire.EmptyTokenId[:], 0)
 	if err != nil {
 		return err
 	}

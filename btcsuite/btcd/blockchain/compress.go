@@ -543,9 +543,11 @@ func decompressTxOutAmount(amount uint64) uint64 {
 
 // compressedTxOutSize returns the number of bytes the passed transaction output
 // fields would take when encoded with the format described above.
-func compressedTxOutSize(amount uint64, pkScript []byte) int {
+func compressedTxOutSize(amount uint64, pkScript []byte, tokenId []byte, tokenAmount uint64) int {
 	return serializeSizeVLQ(compressTxOutAmount(amount)) +
-		compressedScriptSize(pkScript)
+		compressedScriptSize(pkScript) +
+		compressedScriptSize(tokenId) + serializeSizeVLQ(compressTxOutAmount(tokenAmount))
+
 }
 
 // putCompressedTxOut compresses the passed amount and script according to their
@@ -553,34 +555,55 @@ func compressedTxOutSize(amount uint64, pkScript []byte) int {
 // passed target byte slice with the format described above.  The target byte
 // slice must be at least large enough to handle the number of bytes returned by
 // the compressedTxOutSize function or it will panic.
-func putCompressedTxOut(target []byte, amount uint64, pkScript []byte) int {
+func putCompressedTxOut(target []byte, amount uint64, pkScript []byte, tokenId []byte, tokenAmount uint64) int {
 	offset := putVLQ(target, compressTxOutAmount(amount))
 	offset += putCompressedScript(target[offset:], pkScript)
+
+	offset += putCompressedScript(target[offset:], tokenId)
+	offset += putVLQ(target, compressTxOutAmount(tokenAmount))
 	return offset
 }
 
 // decodeCompressedTxOut decodes the passed compressed txout, possibly followed
 // by other data, into its uncompressed amount and script and returns them along
 // with the number of bytes they occupied prior to decompression.
-func decodeCompressedTxOut(serialized []byte) (uint64, []byte, int, error) {
+func decodeCompressedTxOut(serialized []byte) (uint64, []byte, []byte, uint64, int, error) {
 	// Deserialize the compressed amount and ensure there are bytes
 	// remaining for the compressed script.
 	compressedAmount, bytesRead := deserializeVLQ(serialized)
 	if bytesRead >= len(serialized) {
-		return 0, nil, bytesRead, errDeserialize("unexpected end of " +
+		return 0, nil, nil, 0, bytesRead, errDeserialize("unexpected end of " +
 			"data after compressed amount")
 	}
 
+	offset := bytesRead
 	// Decode the compressed script size and ensure there are enough bytes
 	// left in the slice for it.
-	scriptSize := decodeCompressedScriptSize(serialized[bytesRead:])
-	if len(serialized[bytesRead:]) < scriptSize {
-		return 0, nil, bytesRead, errDeserialize("unexpected end of " +
+	scriptSize := decodeCompressedScriptSize(serialized[offset:])
+	if len(serialized[offset:]) < scriptSize {
+		return 0, nil, nil, 0, offset, errDeserialize("unexpected end of " +
 			"data after script size")
 	}
 
 	// Decompress and return the amount and script.
 	amount := decompressTxOutAmount(compressedAmount)
-	script := decompressScript(serialized[bytesRead : bytesRead+scriptSize])
-	return amount, script, bytesRead + scriptSize, nil
+	script := decompressScript(serialized[offset : offset + scriptSize])
+
+	// decode token
+	offset += scriptSize
+	scriptSize = decodeCompressedScriptSize(serialized[offset:])
+	if len(serialized[offset:]) < scriptSize {
+		return 0, nil, nil, 0, offset, errDeserialize("unexpected end of " +
+			"data after tokenid size")
+	}
+	tokenId := decompressScript(serialized[offset : offset+scriptSize])
+
+	offset += scriptSize
+	tokenAmount, bytesRead := deserializeVLQ(serialized[offset:])
+	if bytesRead >= len(serialized[offset:]) {
+		return 0, nil, nil, 0, bytesRead, errDeserialize("unexpected end of " +
+			"data after compressed token amount")
+	}
+
+	return amount, script, tokenId, tokenAmount, offset + bytesRead, nil
 }

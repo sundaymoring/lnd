@@ -413,7 +413,7 @@ func deserializeUtxoEntryV0(serialized []byte) (map[uint32]*UtxoEntry, error) {
 	// Decode and add all of the utxos.
 	for i, outputIndex := range outputIndexes {
 		// Decode the next utxo.
-		amount, pkScript, bytesRead, err := decodeCompressedTxOut(
+		amount, pkScript, tokenId, tokenAmount, bytesRead, err := decodeCompressedTxOut(
 			serialized[offset:])
 		if err != nil {
 			return nil, errDeserialize(fmt.Sprintf("unable to "+
@@ -427,7 +427,10 @@ func deserializeUtxoEntryV0(serialized []byte) (map[uint32]*UtxoEntry, error) {
 			pkScript:    pkScript,
 			blockHeight: int32(blockHeight),
 			packedFlags: packedFlags,
+			tokenAmount: int64(tokenAmount),
 		}
+
+		entries[outputIndex].tokenId.SetBytes(tokenId)
 	}
 
 	return entries, nil
