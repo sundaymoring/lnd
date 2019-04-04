@@ -328,6 +328,7 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			return nil, nil, err
 		}
 
+		// HZY recive and decode rawblock and rawtx
 		if err := bitcoindConn.Start(); err != nil {
 			return nil, nil, fmt.Errorf("unable to connect to "+
 				"bitcoind: %v", err)

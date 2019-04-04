@@ -467,6 +467,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	reservation.nodeAddr = req.NodeAddr
 	reservation.partialState.IdentityPub = req.NodeID
 
+	// HZY select local coin to channel. do not sign here.
 	// If we're on the receiving end of a single funder channel then we
 	// don't need to perform any coin selection. Otherwise, attempt to
 	// obtain enough coins to meet the required funding amount.
@@ -683,6 +684,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	pendingReservation.Lock()
 	defer pendingReservation.Unlock()
 
+	// HZY create funding tx
 	// Create a blank, fresh transaction. Soon to be a complete funding
 	// transaction which will allow opening a lightning channel.
 	pendingReservation.fundingTx = wire.NewMsgTx(1)
@@ -738,6 +740,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	}
 	for i, txIn := range fundingTx.TxIn {
 		info, err := l.FetchInputInfo(&txIn.PreviousOutPoint)
+		// HZY if their input, wait remote sign
 		if err == ErrNotMine {
 			continue
 		} else if err != nil {
@@ -796,6 +799,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 		},
 	}
 
+	// HZY create alice and bob commit tx
 	// With the funding tx complete, create both commitment transactions.
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
@@ -867,6 +871,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 		SigHashes:     txscript.NewTxSigHashes(theirCommitTx),
 		InputIndex:    0,
 	}
+	// HZY sign their commit tx
 	sigTheirCommit, err := l.Cfg.Signer.SignOutputRaw(theirCommitTx, &signDesc)
 	if err != nil {
 		req.err <- err

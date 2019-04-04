@@ -1305,6 +1305,7 @@ func (f *fundingManager) handleFundingAccept(fmsg *fundingAcceptMsg) {
 			},
 		},
 	}
+	//HZY create funding tx and commit tx
 	err = resCtx.reservation.ProcessContribution(remoteContribution)
 	if err != nil {
 		fndgLog.Errorf("Unable to process contribution from %v: %v",
@@ -1329,7 +1330,7 @@ func (f *fundingManager) handleFundingAccept(fmsg *fundingAcceptMsg) {
 	// channel to the barriers map which will be closed once the channel is
 	// fully open.
 	f.barrierMtx.Lock()
-	channelID := lnwire.NewChanIDFromOutPoint(outPoint)
+	channelID := lnwire.NewChanIDFromOutPoint(outPoint) //HZY channel id create here
 	fndgLog.Debugf("Creating chan barrier for ChanID(%v)", channelID)
 	f.newChanBarriers[channelID] = make(chan struct{})
 	f.barrierMtx.Unlock()
@@ -2706,7 +2707,7 @@ func (f *fundingManager) initFundingWorkflow(peer lnpeer.Peer, req *openChanReq)
 // funding workflow.
 func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	var (
-		peerKey        = msg.peer.IdentityKey()
+		peerKey        = msg.peer.Ide// Obtain a new pending channel ID which is used to track thisntityKey() //HZY peer node pubkey.
 		localAmt       = msg.localFundingAmt
 		remoteAmt      = msg.remoteFundingAmt
 		capacity       = localAmt + remoteAmt
@@ -2768,6 +2769,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		return
 	}
 
+	// HZY pendingID is not real chanID
 	// Obtain a new pending channel ID which is used to track this
 	// reservation throughout its lifetime.
 	chanID := f.nextPendingChanID()
