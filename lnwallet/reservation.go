@@ -130,7 +130,8 @@ type ChannelReservation struct {
 func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 	commitFeePerKw SatPerKWeight, wallet *LightningWallet,
 	id uint64, pushMSat lnwire.MilliSatoshi, chainHash *chainhash.Hash,
-	flags lnwire.FundingFlag) (*ChannelReservation, error) {
+	flags lnwire.FundingFlag,
+	tokenId wire.TokenId, fundingFeeAmt btcutil.Amount, fundingTime uint32) (*ChannelReservation, error) {
 
 	var (
 		ourBalance   lnwire.MilliSatoshi
@@ -248,6 +249,7 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 				CommitFee:     commitFee,
 			},
 			Db: wallet.Cfg.Database,
+			FundingTime: txTime,
 		},
 		pushMSat:      pushMSat,
 		reservationID: id,

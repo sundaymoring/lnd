@@ -39,6 +39,9 @@ type Interface interface {
 	NotifyBlocks() error
 	Notifications() <-chan interface{}
 	BackEnd() string
+
+	GetTokenId(symbol string) (wire.TokenId, error)
+	GetTokenSymbol(tokenId wire.TokenId) (string, error)
 }
 
 // Notification types.  These are defined here and processed from from reading

@@ -3,7 +3,10 @@
 
 package lnrpc // import "github.com/lightningnetwork/lnd/lnrpc"
 
-import proto "github.com/golang/protobuf/proto"
+import (
+	"github.com/btcsuite/btcd/wire"
+	proto "github.com/golang/protobuf/proto"
+)
 import fmt "fmt"
 import math "math"
 import _ "google.golang.org/genproto/googleapis/api/annotations"
@@ -3568,6 +3571,10 @@ type OpenChannelRequest struct {
 	MinConfs int32 `protobuf:"varint,11,opt,name=min_confs,proto3" json:"min_confs,omitempty"`
 	// / Whether unconfirmed outputs should be used as inputs for the funding transaction.
 	SpendUnconfirmed     bool     `protobuf:"varint,12,opt,name=spend_unconfirmed,proto3" json:"spend_unconfirmed,omitempty"`
+
+	// /The token in channel
+	Symbol string `protobuf:"bytes,12,opt,name=symbol,proto3" json:"symbol,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -4813,6 +4820,8 @@ type QueryRoutesRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
+
+	TokenId wire.Token
 }
 
 func (m *QueryRoutesRequest) Reset()         { *m = QueryRoutesRequest{} }

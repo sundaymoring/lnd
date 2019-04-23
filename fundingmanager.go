@@ -1068,6 +1068,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 		PushMSat:        msg.PushAmount,
 		Flags:           msg.ChannelFlags,
 		MinConfs:        1,
+		FundingTime:	 msg.FundingTime,
 	}
 
 	reservation, err := f.cfg.Wallet.InitChannelReservation(req)
@@ -2712,6 +2713,8 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		capacity       = localAmt + remoteAmt
 		minHtlc        = msg.minHtlc
 		remoteCsvDelay = msg.remoteCsvDelay
+
+		fundingTime	   = msg.fundingTime
 	)
 
 	// We'll determine our dust limit depending on which chain is active.
@@ -2760,6 +2763,12 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		PushMSat:        msg.pushAmt,
 		Flags:           channelFlags,
 		MinConfs:        msg.minConfs,
+		
+		// for token
+		TokenId:		 msg.tokenId,
+		LocalReserveFeeAmt: msg.localReserveFeeAmt,
+		RemoteReserveFeeAmt: msg.remoteReserveFeeAmt,
+		FundingTime:	 fundingTime,
 	}
 
 	reservation, err := f.cfg.Wallet.InitChannelReservation(req)
@@ -2844,6 +2853,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		DelayedPaymentPoint:  ourContribution.DelayBasePoint.PubKey,
 		FirstCommitmentPoint: ourContribution.FirstCommitmentPoint,
 		ChannelFlags:         channelFlags,
+		FundingTime:		  fundingTime,
 	}
 	if err := msg.peer.SendMessage(false, &fundingOpen); err != nil {
 		e := fmt.Errorf("Unable to send funding request message: %v",

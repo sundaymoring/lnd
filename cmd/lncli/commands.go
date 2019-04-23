@@ -609,6 +609,10 @@ var openChannelCommand = cli.Command{
 				"transaction must satisfy",
 			Value: 1,
 		},
+		cli.StringFlag{
+			Name: "symbol",
+			Usage: "(optional) the token in channel",
+		},
 	},
 	Action: actionDecorator(openChannel),
 }
@@ -698,6 +702,10 @@ func openChannel(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("unable to decode push amt: %v", err)
 		}
+	}
+
+	if ctx.IsSet("symbol") {
+		req.Symbol = ctx.String("symbol")
 	}
 
 	req.Private = ctx.Bool("private")

@@ -5,11 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"math"
-	"net"
-	"sync"
-	"sync/atomic"
-
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -23,6 +18,10 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/shachain"
+	"math"
+	"net"
+	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -111,6 +110,11 @@ type InitFundingReserveMsg struct {
 	//
 	// NOTE: In order to avoid deadlocks, this channel MUST be buffered.
 	resp chan *ChannelReservation
+
+	// for token
+	TokenId wire.TokenId
+	FundingFeeAmt btcutil.Amount
+	FundingTime uint32
 }
 
 // fundingReserveCancelMsg is a message reserved for cancelling an existing
@@ -453,6 +457,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	reservation, err := NewChannelReservation(
 		req.Capacity, req.FundingAmount, req.CommitFeePerKw, l, id,
 		req.PushMSat, l.Cfg.NetParams.GenesisHash, req.Flags,
+		req.TokenId, req.FundingFeeAmt, req.FundingTime,
 	)
 	if err != nil {
 		req.err <- err
@@ -687,6 +692,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	// transaction which will allow opening a lightning channel.
 	pendingReservation.fundingTx = wire.NewMsgTx(1)
 	fundingTx := pendingReservation.fundingTx
+	//fundingTx.Time = pendingReservation.partialState.FundingTime
 
 	// Some temporary variables to cut down on the resolution verbosity.
 	pendingReservation.theirContribution = req.contribution

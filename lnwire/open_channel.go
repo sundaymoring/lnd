@@ -1,6 +1,7 @@
 package lnwire
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"io"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -122,6 +123,12 @@ type OpenChannel struct {
 	// Currently, the least significant bit of this bit field indicates the
 	// initiator of the channel wishes to advertise this channel publicly.
 	ChannelFlags FundingFlag
+
+	// for token
+	TokenId wire.TokenId
+	// If it's the token in the channel, the provider of the handling fee is the party creating the channel
+	FundingFeeAmt btcutil.Amount
+	FundingTime uint32
 }
 
 // A compile time check to ensure OpenChannel implements the lnwire.Message
@@ -153,6 +160,10 @@ func (o *OpenChannel) Encode(w io.Writer, pver uint32) error {
 		o.HtlcPoint,
 		o.FirstCommitmentPoint,
 		o.ChannelFlags,
+
+		o.TokenId,
+		o.FundingFeeAmt,
+		o.FundingTime,
 	)
 }
 
@@ -181,6 +192,10 @@ func (o *OpenChannel) Decode(r io.Reader, pver uint32) error {
 		&o.HtlcPoint,
 		&o.FirstCommitmentPoint,
 		&o.ChannelFlags,
+
+		&o.TokenId,
+		&o.FundingFeeAmt,
+		&o.FundingTime,
 	)
 }
 
@@ -197,6 +212,6 @@ func (o *OpenChannel) MsgType() MessageType {
 //
 // This is part of the lnwire.Message interface.
 func (o *OpenChannel) MaxPayloadLength(uint32) uint32 {
-	// (32 * 2) + (8 * 6) + (4 * 1) + (2 * 2) + (33 * 6) + 1
-	return 319
+	// (32 * 2) + (8 * 6) + (4 * 1) + (2 * 2) + (33 * 6) + 1  + 36 + (8 * 1) +  （4 × 1）
+	return 319 + 48
 }

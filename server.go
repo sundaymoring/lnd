@@ -2697,6 +2697,13 @@ type openChanReq struct {
 
 	updates chan *lnrpc.OpenStatusUpdate
 	err     chan error
+
+	// for token
+	tokenId 	wire.TokenId
+	localReserveFeeAmt btcutil.Amount
+	remoteReserveFeeAmt btcutil.Amount
+
+	fundingTime uint32
 }
 
 // ConnectToPeer requests that the server connect to a Lightning Network peer

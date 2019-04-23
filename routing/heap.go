@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
@@ -23,6 +24,9 @@ type nodeWithDist struct {
 
 	// fee is the fee that this node is charging for forwarding.
 	fee lnwire.MilliSatoshi
+
+	// for token
+	tokenId wire.TokenId
 }
 
 // distanceHeap is a min-distance heap that's used within our path finding

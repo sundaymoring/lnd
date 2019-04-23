@@ -512,9 +512,16 @@ type OpenChannel struct {
 	// TODO(roasbeef): just need to store local and remote HTLC's?
 
 	sync.RWMutex
+
+	// for token
+	TokenId wire.TokenId
+	// If it's the token in the channel, the provider of the handling fee is the party creating the channel
+	FundingFeeAmt btcutil.Amount
+	FundingTime uint32
+
 }
 
-// FullSync serializes, and writes to disk the *full* channel state, using
+// FullSync serializeputChanInfos, and writes to disk the *full* channel state, using
 // both the active channel bucket to store the prefixed column fields, and the
 // remote node's ID to store the remainder of the channel state.
 func (c *OpenChannel) FullSync() error {
@@ -2417,6 +2424,7 @@ func putChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		channel.NumConfsRequired, channel.ChannelFlags,
 		channel.IdentityPub, channel.Capacity, channel.TotalMSatSent,
 		channel.TotalMSatReceived,
+		channel.TokenId, channel.FundingFeeAmt, channel.FundingTime,
 	); err != nil {
 		return err
 	}
@@ -2537,6 +2545,7 @@ func fetchChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		&channel.NumConfsRequired, &channel.ChannelFlags,
 		&channel.IdentityPub, &channel.Capacity, &channel.TotalMSatSent,
 		&channel.TotalMSatReceived,
+		&channel.TokenId, &channel.FundingFeeAmt, &channel.FundingTime,
 	); err != nil {
 		return err
 	}

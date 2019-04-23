@@ -61,6 +61,8 @@ const (
 	// permitted.
 	maxLtcPaymentMSat = lnwire.MilliSatoshi(math.MaxUint32) *
 		btcToLtcConversionRate
+
+	defaultTokenRemainFee = btcutil.Amount(1000000)
 )
 
 var (
@@ -1326,6 +1328,19 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		private:         in.Private,
 		remoteCsvDelay:  remoteCsvDelay,
 		minConfs:        minConfs,
+		fundingTime:	 uint32(time.Now().Unix()),
+	}
+
+	if in.Symbol != "" {
+		if tokenId, err := r.server.cc.chainIO.GetTokenId(in.Symbol); err != nil {
+			return fmt.Errorf("invalid token(symbol: %s)", in.Symbol)
+		} else {
+			req.tokenId = *tokenId
+			req.localReserveFeeAmt = defaultTokenRemainFee
+			req.remoteReserveFeeAmt = defaultTokenRemainFee
+		}
+	} else {
+		req.tokenId = wire.EmptyTokenId
 	}
 
 	updateChan, errChan := r.server.OpenChannel(req)

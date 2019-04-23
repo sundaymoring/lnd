@@ -193,6 +193,8 @@ type Invoice struct {
 	// that the invoice originally didn't specify an amount, or the sender
 	// overpaid.
 	AmtPaid lnwire.MilliSatoshi
+
+	TokenId wire.TokenId
 }
 
 func validateInvoice(i *Invoice) error {
