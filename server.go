@@ -2700,9 +2700,7 @@ type openChanReq struct {
 
 	// for token
 	tokenId 	wire.TokenId
-	localReserveFeeAmt btcutil.Amount
-	remoteReserveFeeAmt btcutil.Amount
-
+	fundingFeeAmt btcutil.Amount
 	fundingTime uint32
 }
 

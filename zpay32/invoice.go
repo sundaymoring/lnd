@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 	"strings"
 	"time"
 
@@ -41,6 +42,10 @@ const (
 	// single private route.
 	hopHintLen = 51
 
+	// tokenIdBase32Len is the number of 5-bit groups needed to encode a
+	// 36-byte tokenId. Note that the last group will be padded with zeroes.
+	tokenIdBase32Len = 58
+
 	// The following byte values correspond to the supported field types.
 	// The field name is the character representing that 5-bit value in the
 	// bech32 string.
@@ -68,6 +73,9 @@ const (
 
 	// fieldTypeC contains an optional requested final CLTV delta.
 	fieldTypeC = 24
+
+	// fieldTypeP is the field containing the token id.
+	fieldTypeT = 25
 )
 
 // MessageSigner is passed to the Encode method to provide a signature
@@ -147,6 +155,8 @@ type Invoice struct {
 	//
 	// NOTE: This is optional.
 	RouteHints [][]routing.HopHint
+
+	TokenId *wire.TokenId
 }
 
 // Amount is a functional option that allows callers of NewInvoice to set the
@@ -217,6 +227,12 @@ func FallbackAddr(fallbackAddr btcutil.Address) func(*Invoice) {
 func RouteHint(routeHint []routing.HopHint) func(*Invoice) {
 	return func(i *Invoice) {
 		i.RouteHints = append(i.RouteHints, routeHint)
+	}
+}
+
+func TokenId(tokenId *wire.TokenId) func(*Invoice) {
+	return func(i *Invoice) {
+		i.TokenId = tokenId
 	}
 }
 
@@ -664,6 +680,15 @@ func parseTaggedFields(invoice *Invoice, fields []byte, net *chaincfg.Params) er
 			}
 
 			invoice.RouteHints = append(invoice.RouteHints, routeHint)
+
+		case fieldTypeT:
+			if invoice.TokenId != nil{
+				// We skip the field if we have already seen a
+				// supported one.
+				continue
+			}
+
+			invoice.TokenId, err = parseTokenId(base32Data)
 		default:
 			// Ignore unknown type.
 		}
@@ -875,6 +900,24 @@ func parseRouteHint(data []byte) ([]routing.HopHint, error) {
 	return routeHint, nil
 }
 
+// parseTokenId converts the data (encoded in base32) into a wire.TokenId
+func parseTokenId(data []byte) (*wire.TokenId, error) {
+	paymentTokenId := &wire.TokenId{}
+
+	// As BOLT-11 states, a reader must skip over the payment hash field if
+	// it does not have a length of 52, so avoid returning an error.
+	if len(data) != tokenIdBase32Len {
+		return nil, nil
+	}
+
+	tokenId, err := bech32.ConvertBits(data, 5, 8, false)
+	if err != nil {
+		return nil, err
+	}
+	paymentTokenId.SetBytes(tokenId)
+	return paymentTokenId, nil
+}
+
 // writeTaggedFields writes the non-nil tagged fields of the Invoice to the
 // base32 buffer.
 func writeTaggedFields(bufferBase32 *bytes.Buffer, invoice *Invoice) error {
@@ -1021,6 +1064,25 @@ func writeTaggedFields(bufferBase32 *bytes.Buffer, invoice *Invoice) error {
 		}
 
 		err = writeTaggedField(bufferBase32, fieldTypeN, pubKeyBase32)
+		if err != nil {
+			return err
+		}
+	}
+
+	if invoice.TokenId != nil {
+		// Convert 36 byte hash to 58 5-bit groups.
+		descBase32, err := bech32.ConvertBits(
+			invoice.TokenId[:], 8, 5, true)
+		if err != nil {
+			return err
+		}
+
+		if len(descBase32) != tokenIdBase32Len {
+			return fmt.Errorf("invalid tokenId length: %d",
+				len(invoice.TokenId))
+		}
+
+		err = writeTaggedField(bufferBase32, fieldTypeT, descBase32)
 		if err != nil {
 			return err
 		}

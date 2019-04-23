@@ -6422,6 +6422,10 @@ type Invoice struct {
 	// *
 	// The state the invoice is in.
 	State                Invoice_InvoiceState `protobuf:"varint,21,opt,name=state,proto3,enum=lnrpc.Invoice_InvoiceState" json:"state,omitempty"`
+
+	// /The token in invoice
+	Symbol string `protobuf:"bytes,21,opt,name=symbol,proto3" json:"symbol,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
 	XXX_sizecache        int32                `json:"-"`

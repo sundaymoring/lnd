@@ -2766,8 +2766,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		
 		// for token
 		TokenId:		 msg.tokenId,
-		LocalReserveFeeAmt: msg.localReserveFeeAmt,
-		RemoteReserveFeeAmt: msg.remoteReserveFeeAmt,
+		FundingFeeAmt:   msg.fundingFeeAmt,
 		FundingTime:	 fundingTime,
 	}
 
@@ -2853,6 +2852,9 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		DelayedPaymentPoint:  ourContribution.DelayBasePoint.PubKey,
 		FirstCommitmentPoint: ourContribution.FirstCommitmentPoint,
 		ChannelFlags:         channelFlags,
+
+		TokenId:		 	  msg.tokenId,
+		FundingFeeAmt:   	  msg.fundingFeeAmt,
 		FundingTime:		  fundingTime,
 	}
 	if err := msg.peer.SendMessage(false, &fundingOpen); err != nil {

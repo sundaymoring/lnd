@@ -1219,6 +1219,30 @@ func extractOpenChannelMinConfs(in *lnrpc.OpenChannelRequest) (int32, error) {
 	}
 }
 
+func (r *rpcServer) GetTokenIdWithSymbol(symbol string) (*wire.TokenId, error) {
+	if symbol == "" {
+		return &wire.EmptyTokenId, nil
+	}
+
+	if tokenId, err := r.server.cc.chainIO.GetTokenId(symbol); err != nil {
+		return nil, fmt.Errorf("invalid token(symbol: %s)", symbol)
+	} else {
+		return tokenId, nil
+	}
+}
+
+func (r *rpcServer) GetSymbolWithTokenId(tokenId *wire.TokenId) (string, error) {
+	if *tokenId == wire.EmptyTokenId {
+		return "", nil
+	}
+
+	if symbol, err := r.server.cc.chainIO.GetTokenSymbol(tokenId); err != nil {
+		return "", errors.New("invalid token")
+	} else {
+		return symbol, nil
+	}
+}
+
 // OpenChannel attempts to open a singly funded channel specified in the
 // request to a remote peer.
 func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
@@ -1331,16 +1355,11 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		fundingTime:	 uint32(time.Now().Unix()),
 	}
 
-	if in.Symbol != "" {
-		if tokenId, err := r.server.cc.chainIO.GetTokenId(in.Symbol); err != nil {
-			return fmt.Errorf("invalid token(symbol: %s)", in.Symbol)
-		} else {
-			req.tokenId = *tokenId
-			req.localReserveFeeAmt = defaultTokenRemainFee
-			req.remoteReserveFeeAmt = defaultTokenRemainFee
-		}
+	if tokenId, err := r.GetTokenIdWithSymbol(in.Symbol); err != nil {
+		return err
 	} else {
-		req.tokenId = wire.EmptyTokenId
+		req.tokenId = *tokenId
+		req.fundingFeeAmt = defaultTokenRemainFee
 	}
 
 	updateChan, errChan := r.server.OpenChannel(req)
@@ -3547,8 +3566,13 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 
 			numHints++
 		}
-
 	}
+
+	tokenId, err := r.GetTokenIdWithSymbol(invoice.Symbol)
+	if err != nil {
+		return nil, err
+	}
+	options = append(options, zpay32.TokenId(tokenId))
 
 	// Create and encode the payment request as a bech32 (zpay32) string.
 	creationDate := time.Now()
@@ -3578,6 +3602,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		},
 	}
 	copy(newInvoice.Terms.PaymentPreimage[:], paymentPreimage[:])
+	newInvoice.TokenId.SetBytes(tokenId[:])
 
 	rpcsLog.Tracef("[addinvoice] adding new invoice %v",
 		newLogClosure(func() string {
