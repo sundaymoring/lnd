@@ -72,9 +72,17 @@ type InitFundingReserveMsg struct {
 	// FundingAmount is the amount of funds requested for this channel.
 	FundingAmount btcutil.Amount
 
+	// FundingTokenAmount is the token amount of funds requested for this channel.
+	FundingTokenAmount btcutil.Amount
+
+	// FundingTokenAmount is the token amount of funds requested for this channel.
+	TokenId *wire.TokenId
+
 	// Capacity is the total capacity of the channel which includes the
 	// amount of funds the remote party contributes (if any).
 	Capacity btcutil.Amount
+
+	CapacityToken btcutil.Amount
 
 	// CommitFeePerKw is the starting accepted satoshis/Kw fee for the set
 	// of initial commitment transactions. In order to ensure timely
@@ -89,6 +97,8 @@ type InitFundingReserveMsg struct {
 	// PushMSat is the number of milli-satoshis that should be pushed over
 	// the responder as part of the initial channel creation.
 	PushMSat lnwire.MilliSatoshi
+
+	PushTokenMSat lnwire.MilliSatoshi
 
 	// Flags are the channel flags specified by the initiator in the
 	// open_channel message.
@@ -450,9 +460,9 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	}
 
 	id := atomic.AddUint64(&l.nextFundingID, 1)
-	reservation, err := NewChannelReservation(
-		req.Capacity, req.FundingAmount, req.CommitFeePerKw, l, id,
-		req.PushMSat, l.Cfg.NetParams.GenesisHash, req.Flags,
+	reservation, err := NewChannelReservation(req.TokenId,
+		req.Capacity, req.CapacityToken, req.FundingAmount, req.FundingTokenAmount, req.CommitFeePerKw, l, id,
+		req.PushMSat, req.PushTokenMSat, l.Cfg.NetParams.GenesisHash, req.Flags,
 	)
 	if err != nil {
 		req.err <- err
@@ -474,9 +484,10 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 		// Coin selection is done on the basis of sat/kw, so we'll use
 		// the fee rate passed in to perform coin selection.
 		err := l.selectCoinsAndChange(
-			req.FundingFeePerKw, req.FundingAmount, req.MinConfs,
+			req.FundingFeePerKw, req.FundingAmount, req.FundingTokenAmount, req.TokenId, req.MinConfs,
 			reservation.ourContribution,
 		)
+
 		if err != nil {
 			req.err <- err
 			req.resp <- nil
@@ -1270,7 +1281,7 @@ func (l *LightningWallet) WithCoinSelectLock(f func() error) error {
 // within the passed contribution's inputs. If necessary, a change address will
 // also be generated.
 func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
-	amt btcutil.Amount, minConfs int32,
+	amt, tokenAmt btcutil.Amount, tokenId *wire.TokenId, minConfs int32,
 	contribution *ChannelContribution) error {
 
 	// We hold the coin select mutex while querying for outputs, and
@@ -1288,6 +1299,7 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	if err != nil {
 		return err
 	}
+	// HTODO select token coin
 
 	// Perform coin selection over our available, unlocked unspent outputs
 	// in order to find enough coins to meet the funding amount

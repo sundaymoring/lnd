@@ -3554,20 +3554,28 @@ type OpenChannelRequest struct {
 	LocalFundingAmount int64 `protobuf:"varint,4,opt,name=local_funding_amount,proto3" json:"local_funding_amount,omitempty"`
 	// / The number of satoshis to push to the remote side as part of the initial commitment state
 	PushSat int64 `protobuf:"varint,5,opt,name=push_sat,proto3" json:"push_sat,omitempty"`
+	// / The token id of channel to support
+	TokenID []byte `protobuf:"bytes,6,opt,name=token_id,proto3" json:"token_id,omitempty"`
+	// / The token id string of channel to support
+	TokenIDString string `protobuf:"bytes,7,opt,name=token_id_string,proto3" json:"token_id_string,omitempty"`
+	// / The token number of satoshis the wallet should commit to the channel
+	LocalTokenAmount int64 `protobuf:"varint,8,opt,name=local_funding_token_amount,proto3" json:"local_funding_token_amount,omitempty"`
+	// / The token number of satoshis to push to the remote side as part of the initial commitment state
+	PushTokenSat int64 `protobuf:"varint,9,opt,name=push_token_sat,proto3" json:"push_token_sat,omitempty"`
 	// / The target number of blocks that the funding transaction should be confirmed by.
-	TargetConf int32 `protobuf:"varint,6,opt,name=target_conf,json=targetConf,proto3" json:"target_conf,omitempty"`
+	TargetConf int32 `protobuf:"varint,10,opt,name=target_conf,json=targetConf,proto3" json:"target_conf,omitempty"`
 	// / A manual fee rate set in sat/byte that should be used when crafting the funding transaction.
-	SatPerByte int64 `protobuf:"varint,7,opt,name=sat_per_byte,json=satPerByte,proto3" json:"sat_per_byte,omitempty"`
+	SatPerByte int64 `protobuf:"varint,11,opt,name=sat_per_byte,json=satPerByte,proto3" json:"sat_per_byte,omitempty"`
 	// / Whether this channel should be private, not announced to the greater network.
-	Private bool `protobuf:"varint,8,opt,name=private,proto3" json:"private,omitempty"`
+	Private bool `protobuf:"varint,12,opt,name=private,proto3" json:"private,omitempty"`
 	// / The minimum value in millisatoshi we will require for incoming HTLCs on the channel.
-	MinHtlcMsat int64 `protobuf:"varint,9,opt,name=min_htlc_msat,proto3" json:"min_htlc_msat,omitempty"`
+	MinHtlcMsat int64 `protobuf:"varint,13,opt,name=min_htlc_msat,proto3" json:"min_htlc_msat,omitempty"`
 	// / The delay we require on the remote's commitment transaction. If this is not set, it will be scaled automatically with the channel size.
-	RemoteCsvDelay uint32 `protobuf:"varint,10,opt,name=remote_csv_delay,proto3" json:"remote_csv_delay,omitempty"`
+	RemoteCsvDelay uint32 `protobuf:"varint,14,opt,name=remote_csv_delay,proto3" json:"remote_csv_delay,omitempty"`
 	// / The minimum number of confirmations each one of your outputs used for the funding transaction must satisfy.
-	MinConfs int32 `protobuf:"varint,11,opt,name=min_confs,proto3" json:"min_confs,omitempty"`
+	MinConfs int32 `protobuf:"varint,15,opt,name=min_confs,proto3" json:"min_confs,omitempty"`
 	// / Whether unconfirmed outputs should be used as inputs for the funding transaction.
-	SpendUnconfirmed     bool     `protobuf:"varint,12,opt,name=spend_unconfirmed,proto3" json:"spend_unconfirmed,omitempty"`
+	SpendUnconfirmed     bool     `protobuf:"varint,16,opt,name=spend_unconfirmed,proto3" json:"spend_unconfirmed,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

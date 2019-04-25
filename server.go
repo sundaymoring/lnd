@@ -2678,8 +2678,12 @@ type openChanReq struct {
 
 	localFundingAmt  btcutil.Amount
 	remoteFundingAmt btcutil.Amount
+	localTokenAmt	 btcutil.Amount
+	remoteTokenAmt	 btcutil.Amount
+	tokenId			 wire.TokenId
 
-	pushAmt lnwire.MilliSatoshi
+	pushAmt 		lnwire.MilliSatoshi
+	pushTokenAmt	lnwire.MilliSatoshi
 
 	fundingFeePerKw lnwallet.SatPerKWeight
 

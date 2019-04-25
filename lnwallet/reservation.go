@@ -24,6 +24,10 @@ type ChannelContribution struct {
 	// transaction.
 	FundingAmount btcutil.Amount
 
+	FundingTokenAmount btcutil.Amount
+
+	TokenId *wire.TokenId
+
 	// Inputs to the funding transaction.
 	Inputs []*wire.TxIn
 
@@ -127,15 +131,18 @@ type ChannelReservation struct {
 // used only internally by lnwallet. In order to concurrent safety, the
 // creation of all channel reservations should be carried out via the
 // lnwallet.InitChannelReservation interface.
-func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
+func NewChannelReservation(tokenId *wire.TokenId, capacity, capacityToken, fundingAmt, fundingTokenAmt btcutil.Amount,
 	commitFeePerKw SatPerKWeight, wallet *LightningWallet,
-	id uint64, pushMSat lnwire.MilliSatoshi, chainHash *chainhash.Hash,
+	id uint64, pushMSat, pushTokenMSat lnwire.MilliSatoshi, chainHash *chainhash.Hash,
 	flags lnwire.FundingFlag) (*ChannelReservation, error) {
 
 	var (
 		ourBalance   lnwire.MilliSatoshi
 		theirBalance lnwire.MilliSatoshi
 		initiator    bool
+
+		ourTokenBalance lnwire.MilliSatoshi
+		theirTokenBalance lnwire.MilliSatoshi
 	)
 
 	commitFee := commitFeePerKw.FeeForWeight(input.CommitWeight)
@@ -143,17 +150,22 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 	capacityMSat := lnwire.NewMSatFromSatoshis(capacity)
 	feeMSat := lnwire.NewMSatFromSatoshis(commitFee)
 
+	fundingTokenMSat := lnwire.NewMSatFromSatoshis(fundingTokenAmt)
+	capacityTokenMSat := lnwire.NewMSatFromSatoshis(capacityToken)
+
 	// If we're the responder to a single-funder reservation, then we have
 	// no initial balance in the channel unless the remote party is pushing
 	// some funds to us within the first commitment state.
 	if fundingAmt == 0 {
 		ourBalance = pushMSat
+		ourTokenBalance = pushTokenMSat
 		theirBalance = capacityMSat - feeMSat - pushMSat
+		theirTokenBalance = capacityTokenMSat - pushTokenMSat
 		initiator = false
 
 		// If the responder doesn't have enough funds to actually pay
 		// the fees, then we'll bail our early.
-		if int64(theirBalance) < 0 {
+		if int64(theirBalance) < 0 || int64(theirTokenBalance) < 0 {
 			return nil, ErrFunderBalanceDust(
 				int64(commitFee), int64(theirBalance.ToSatoshis()),
 				int64(2*DefaultDustLimit()),
@@ -170,19 +182,26 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 			// amount pushed as part of the initial state.
 			ourBalance = capacityMSat - feeMSat - pushMSat
 			theirBalance = pushMSat
+
+			ourTokenBalance = capacityTokenMSat - pushTokenMSat
+			theirTokenBalance = pushTokenMSat
 		} else {
 			// Otherwise, this is a dual funder workflow where both
 			// slides split the amount funded and the commitment
 			// fee.
 			ourBalance = fundingMSat - (feeMSat / 2)
 			theirBalance = capacityMSat - fundingMSat - (feeMSat / 2) + pushMSat
+
+			// HTODO consider right?
+			ourTokenBalance = fundingTokenMSat
+			theirTokenBalance = capacityTokenMSat - fundingTokenMSat
 		}
 
 		initiator = true
 
 		// If we, the initiator don't have enough funds to actually pay
 		// the fees, then we'll exit with an error.
-		if int64(ourBalance) < 0 {
+		if int64(ourBalance) < 0 || int64(ourTokenBalance) < 0 {
 			return nil, ErrFunderBalanceDust(
 				int64(commitFee), int64(ourBalance),
 				int64(2*DefaultDustLimit()),
@@ -223,10 +242,14 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 		ourContribution: &ChannelContribution{
 			FundingAmount: ourBalance.ToSatoshis(),
 			ChannelConfig: &channeldb.ChannelConfig{},
+			FundingTokenAmount: ourTokenBalance.ToSatoshis(),
+			TokenId:tokenId,
 		},
 		theirContribution: &ChannelContribution{
 			FundingAmount: theirBalance.ToSatoshis(),
 			ChannelConfig: &channeldb.ChannelConfig{},
+			FundingTokenAmount: theirTokenBalance.ToSatoshis(),
+			TokenId:tokenId,
 		},
 		partialState: &channeldb.OpenChannel{
 			ChanType:     chanType,
@@ -240,12 +263,18 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 				RemoteBalance: theirBalance,
 				FeePerKw:      btcutil.Amount(commitFeePerKw),
 				CommitFee:     commitFee,
+				LocalTokenBalance:	ourTokenBalance,
+				RemoteTokenBalance:	theirTokenBalance,
+				TokenId:	tokenId,
 			},
 			RemoteCommitment: channeldb.ChannelCommitment{
 				LocalBalance:  ourBalance,
 				RemoteBalance: theirBalance,
 				FeePerKw:      btcutil.Amount(commitFeePerKw),
 				CommitFee:     commitFee,
+				LocalTokenBalance:	ourTokenBalance,
+				RemoteTokenBalance:	theirTokenBalance,
+				TokenId:	tokenId,
 			},
 			Db: wallet.Cfg.Database,
 		},

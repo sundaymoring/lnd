@@ -264,6 +264,10 @@ type ChannelCommitment struct {
 	// channel directly spendable by the remote node.
 	RemoteBalance lnwire.MilliSatoshi
 
+	LocalTokenBalance lnwire.MilliSatoshi
+	RemoteTokenBalance lnwire.MilliSatoshi
+	TokenId *wire.TokenId
+
 	// CommitFee is the amount calculated to be paid in fees for the
 	// current set of commitment transactions. The fee amount is persisted
 	// with the channel in order to allow the fee amount to be removed and
@@ -512,6 +516,8 @@ type OpenChannel struct {
 	// TODO(roasbeef): just need to store local and remote HTLC's?
 
 	sync.RWMutex
+
+
 }
 
 // FullSync serializes, and writes to disk the *full* channel state, using

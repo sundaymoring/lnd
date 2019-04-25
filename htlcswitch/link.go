@@ -484,6 +484,9 @@ func (l *channelLink) WaitForShutdown() {
 // initiate new channel state. We also require that the short channel ID not be
 // the all-zero source ID, meaning that the channel has had its ID finalized.
 func (l *channelLink) EligibleToForward() bool {
+	log.Info("HZY l.channel.RemoteNextRevocation()=", l.channel.RemoteNextRevocation(),
+		" ,l.ShortChanID()=", l.ShortChanID(),
+		" , sourceHop=", sourceHop)
 	return l.channel.RemoteNextRevocation() != nil &&
 		l.ShortChanID() != sourceHop
 }

@@ -62,6 +62,7 @@ const (
 	// initial precautionary limit while implementations are battle tested
 	// in the real world.
 	maxBtcFundingAmount = btcutil.Amount(1<</*24*/48) - 1
+	maxTokenFundingAmount = btcutil.Amount(1<</*24*/48) - 1
 
 	// maxLtcFundingAmount is a soft-limit of the maximum channel size
 	// currently accepted on the Litecoin chain within the Lightning
@@ -2709,7 +2710,10 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		peerKey        = msg.peer.IdentityKey()
 		localAmt       = msg.localFundingAmt
 		remoteAmt      = msg.remoteFundingAmt
+		localTokenAmt = msg.localTokenAmt
+		remoteTokenAmt = msg.remoteTokenAmt
 		capacity       = localAmt + remoteAmt
+		capacityToken  = localTokenAmt + remoteTokenAmt
 		minHtlc        = msg.minHtlc
 		remoteCsvDelay = msg.remoteCsvDelay
 	)
@@ -2724,8 +2728,8 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	}
 
 	fndgLog.Infof("Initiating fundingRequest(localAmt=%v, remoteAmt=%v, "+
-		"capacity=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v)",
-		localAmt, msg.pushAmt, capacity, msg.chainHash,
+		"capacity=%v, tokenId=%v, localTokenAmt=%v, remoteTokenAmt=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v)",
+		localAmt, msg.pushAmt, capacity, msg.tokenId, localTokenAmt, remoteTokenAmt, msg.chainHash,
 		peerKey.SerializeCompressed(), ourDustLimit, msg.minConfs)
 
 	// First, we'll query the fee estimator for a fee that should get the
@@ -2754,10 +2758,14 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		NodeID:          peerKey,
 		NodeAddr:        msg.peer.Address(),
 		FundingAmount:   localAmt,
+		FundingTokenAmount: localTokenAmt,
+		TokenId:   		 &msg.tokenId,
 		Capacity:        capacity,
+		CapacityToken:	 capacityToken,
 		CommitFeePerKw:  commitFeePerKw,
 		FundingFeePerKw: msg.fundingFeePerKw,
 		PushMSat:        msg.pushAmt,
+		PushTokenMSat:	 msg.pushTokenAmt,
 		Flags:           channelFlags,
 		MinConfs:        msg.minConfs,
 	}

@@ -1223,8 +1223,8 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 	updateStream lnrpc.Lightning_OpenChannelServer) error {
 
 	rpcsLog.Tracef("[openchannel] request to NodeKey(%v) "+
-		"allocation(us=%v, them=%v)", in.NodePubkeyString,
-		in.LocalFundingAmount, in.PushSat)
+		"allocation(us=%v, them=%v) tokenInfo(id=%v, us=%v, them=%v)", in.NodePubkeyString,
+		in.LocalFundingAmount, in.PushSat, in.TokenIDString, in.LocalTokenAmount, in.PushTokenSat)
 
 	if !r.server.Started() {
 		return fmt.Errorf("chain backend is still syncing, server " +
@@ -1235,13 +1235,16 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 	remoteInitialBalance := btcutil.Amount(in.PushSat)
 	minHtlc := lnwire.MilliSatoshi(in.MinHtlcMsat)
 	remoteCsvDelay := uint16(in.RemoteCsvDelay)
+	localTokenAmt := btcutil.Amount(in.LocalTokenAmount)
+	remoteTokenAmt := btcutil.Amount(in.PushTokenSat)
+
 
 	// Ensure that the initial balance of the remote party (if pushing
 	// satoshis) does not exceed the amount the local party has requested
 	// for funding.
 	//
 	// TODO(roasbeef): incorporate base fee?
-	if remoteInitialBalance >= localFundingAmt {
+	if remoteInitialBalance >= localFundingAmt || remoteTokenAmt >= localTokenAmt {
 		return fmt.Errorf("amount pushed to remote peer for initial " +
 			"state must be below the local funding amount")
 	}
@@ -1249,7 +1252,7 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 	// Ensure that the user doesn't exceed the current soft-limit for
 	// channel size. If the funding amount is above the soft-limit, then
 	// we'll reject the request.
-	if localFundingAmt > maxFundingAmount {
+	if localFundingAmt > maxFundingAmount || localTokenAmt > maxTokenFundingAmount {
 		return fmt.Errorf("funding amount is too large, the max "+
 			"channel size is: %v", maxFundingAmount)
 	}
@@ -1320,13 +1323,18 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		targetPubkey:    nodePubKey,
 		chainHash:       *activeNetParams.GenesisHash,
 		localFundingAmt: localFundingAmt,
+		localTokenAmt:	 localTokenAmt,
 		pushAmt:         lnwire.NewMSatFromSatoshis(remoteInitialBalance),
+		pushTokenAmt:	 lnwire.NewMSatFromSatoshis(remoteTokenAmt),
+		//tokenId:		 in.TokenID
 		minHtlc:         minHtlc,
 		fundingFeePerKw: feeRate,
 		private:         in.Private,
 		remoteCsvDelay:  remoteCsvDelay,
 		minConfs:        minConfs,
 	}
+	//HTODO tokenid convert from in.tokenID
+	copy(req.tokenId[:], in.TokenID)
 
 	updateChan, errChan := r.server.OpenChannel(req)
 
@@ -1832,7 +1840,7 @@ func (r *rpcServer) fetchActiveChannel(chanPoint wire.OutPoint) (
 // concerning the number of open+pending channels.
 func (r *rpcServer) GetInfo(ctx context.Context,
 	in *lnrpc.GetInfoRequest) (*lnrpc.GetInfoResponse, error) {
-
+	rpcsLog.Infof("getinfo start process")
 	serverPeers := r.server.Peers()
 
 	openChannels, err := r.server.chanDB.FetchAllOpenChannels()
@@ -2395,12 +2403,15 @@ func (r *rpcServer) ListChannels(ctx context.Context,
 			// by the switch *and* able to forward
 			// incoming/outgoing payments.
 			linkActive = link.EligibleToForward()
+		} else {
+			rpcsLog.Info("HZY r.server.htlcSwitch.GetLink(channelID) err=", err)
 		}
 
 		// Next, we'll determine whether we should add this channel to
 		// our list depending on the type of channels requested to us.
 		isActive := peerOnline && linkActive
 		channel := createRPCOpenChannel(r, graph, dbChannel, isActive)
+		rpcsLog.Info("HZY peeroOnLine=", peerOnline, ", linkActive=", linkActive)
 
 		// We'll only skip returning this channel if we were requested
 		// for a specific kind and this channel doesn't satisfy it.

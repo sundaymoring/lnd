@@ -565,6 +565,22 @@ var openChannelCommand = cli.Command{
 				"channel and sending the remote party funds, " +
 				"but done all in one step",
 		},
+		cli.StringFlag{
+			Name: "token_id",
+			Usage: "(optional) token_id with channel, default: cnet id",
+		},
+		cli.IntFlag{
+			Name: "local_token_amt",
+			Usage: "the number of token satoshis the wallet should commit to the channel",
+		},
+		cli.IntFlag{
+			Name: "push_token_amt",
+			Usage: "the number of token satoshis to give the remote side " +
+				"as part of the initial commitment state, " +
+				"this is equivalent to first opening a " +
+				"channel and sending the remote party funds, " +
+				"but done all in one step",
+		},
 		cli.BoolFlag{
 			Name:  "block",
 			Usage: "block and wait until the channel is fully open",
@@ -698,6 +714,23 @@ func openChannel(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("unable to decode push amt: %v", err)
 		}
+	}
+
+	if ctx.IsSet("token_id") {
+		tokenID, err := hex.DecodeString(ctx.String("token_id"))
+		if err != nil {
+			return fmt.Errorf("unable to decode token id: %v", err)
+		}
+		var local_token_amt, push_token_amt int64
+		if ctx.IsSet("local_token_amt") {
+			local_token_amt = int64(ctx.Int("local_token_amt"))
+		}
+		if ctx.IsSet("push_token_amt") {
+			push_token_amt = int64(ctx.Int("push_token_amt"))
+		}
+		req.TokenID = tokenID
+		req.LocalTokenAmount = local_token_amt
+		req.PushTokenSat = push_token_amt
 	}
 
 	req.Private = ctx.Bool("private")
