@@ -480,7 +480,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 		// the fee rate passed in to perform coin selection.
 		err := l.selectCoinsAndChange(
 			req.FundingFeePerKw, req.FundingAmount, req.MinConfs,
-			reservation.ourContribution,
+			reservation.ourContribution, req.TokenId, req.FundingFeeAmt,
 		)
 		if err != nil {
 			req.err <- err
@@ -1277,7 +1277,7 @@ func (l *LightningWallet) WithCoinSelectLock(f func() error) error {
 // also be generated.
 func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	amt btcutil.Amount, minConfs int32,
-	contribution *ChannelContribution) error {
+	contribution *ChannelContribution, tokenId *wire.TokenId, fundingFeeAmt btcutil.Amount) error {
 
 	// We hold the coin select mutex while querying for outputs, and
 	// performing coin selection in order to avoid inadvertent double

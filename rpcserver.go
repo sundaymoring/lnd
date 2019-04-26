@@ -1508,6 +1508,14 @@ func (r *rpcServer) OpenChannelSync(ctx context.Context,
 		private:         in.Private,
 		remoteCsvDelay:  remoteCsvDelay,
 		minConfs:        minConfs,
+		fundingTime:	 uint32(time.Now().Unix()),
+	}
+
+	if tokenId, err := r.GetTokenIdWithSymbol(in.Symbol); err != nil {
+		return nil, err
+	} else {
+		req.tokenId = *tokenId
+		req.fundingFeeAmt = defaultTokenRemainFee
 	}
 
 	updateChan, errChan := r.server.OpenChannel(req)
@@ -3602,7 +3610,6 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		},
 	}
 	copy(newInvoice.Terms.PaymentPreimage[:], paymentPreimage[:])
-	newInvoice.TokenId.SetBytes(tokenId[:])
 
 	rpcsLog.Tracef("[addinvoice] adding new invoice %v",
 		newLogClosure(func() string {

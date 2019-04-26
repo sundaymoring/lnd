@@ -2479,6 +2479,11 @@ var addInvoiceCommand = cli.Command{
 				"private channels in order to assist the " +
 				"payer in reaching you",
 		},
+
+		cli.StringFlag{
+			Name: "symbol",
+			Usage: "(optional) the token in this invoice",
+		},
 	},
 	Action: actionDecorator(addInvoice),
 }
@@ -2489,6 +2494,7 @@ func addInvoice(ctx *cli.Context) error {
 		descHash []byte
 		receipt  []byte
 		amt      int64
+		symbol 	 string
 		err      error
 	)
 
@@ -2529,6 +2535,10 @@ func addInvoice(ctx *cli.Context) error {
 		return fmt.Errorf("unable to parse receipt: %v", err)
 	}
 
+	if ctx.IsSet("symbol") {
+		symbol = ctx.String("symbol")
+	}
+
 	invoice := &lnrpc.Invoice{
 		Memo:            ctx.String("memo"),
 		Receipt:         receipt,
@@ -2538,6 +2548,7 @@ func addInvoice(ctx *cli.Context) error {
 		FallbackAddr:    ctx.String("fallback_addr"),
 		Expiry:          ctx.Int64("expiry"),
 		Private:         ctx.Bool("private"),
+		Symbol:			 symbol,
 	}
 
 	resp, err := client.AddInvoice(context.Background(), invoice)

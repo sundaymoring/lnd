@@ -1046,8 +1046,8 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 		return
 	}
 
-	fndgLog.Infof("Recv'd fundingRequest(amt=%v, push=%v, delay=%v, "+
-		"pendingId=%x) from peer(%x)", amt, msg.PushAmount,
+	fndgLog.Infof("Recv'd fundingRequest(amt=%v, push=%v, tokenId=%v, fundingFeeAmt=%v, delay=%v, "+
+		"pendingId=%x) from peer(%x)", amt, msg.PushAmount, msg.TokenId, msg.FundingFeeAmt,
 		msg.CsvDelay, msg.PendingChannelID,
 		fmsg.peer.IdentityKey().SerializeCompressed())
 
@@ -1068,6 +1068,8 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 		PushMSat:        msg.PushAmount,
 		Flags:           msg.ChannelFlags,
 		MinConfs:        1,
+		TokenId: 		 msg.TokenId,
+		FundingFeeAmt:   msg.FundingFeeAmt,
 		FundingTime:	 msg.FundingTime,
 	}
 
@@ -2713,8 +2715,6 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		capacity       = localAmt + remoteAmt
 		minHtlc        = msg.minHtlc
 		remoteCsvDelay = msg.remoteCsvDelay
-
-		fundingTime	   = msg.fundingTime
 	)
 
 	// We'll determine our dust limit depending on which chain is active.
@@ -2727,9 +2727,9 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	}
 
 	fndgLog.Infof("Initiating fundingRequest(localAmt=%v, remoteAmt=%v, "+
-		"capacity=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v)",
+		"capacity=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v, tokenId=%v, fundingFeeAmt=%v)",
 		localAmt, msg.pushAmt, capacity, msg.chainHash,
-		peerKey.SerializeCompressed(), ourDustLimit, msg.minConfs)
+		peerKey.SerializeCompressed(), ourDustLimit, msg.minConfs, msg.tokenId, msg.fundingFeeAmt)
 
 	// First, we'll query the fee estimator for a fee that should get the
 	// commitment transaction confirmed by the next few blocks (conf target
@@ -2767,7 +2767,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		// for token
 		TokenId:		 msg.tokenId,
 		FundingFeeAmt:   msg.fundingFeeAmt,
-		FundingTime:	 fundingTime,
+		FundingTime:	 msg.fundingTime,
 	}
 
 	reservation, err := f.cfg.Wallet.InitChannelReservation(req)
@@ -2855,7 +2855,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 
 		TokenId:		 	  msg.tokenId,
 		FundingFeeAmt:   	  msg.fundingFeeAmt,
-		FundingTime:		  fundingTime,
+		FundingTime:		  msg.fundingTime,
 	}
 	if err := msg.peer.SendMessage(false, &fundingOpen); err != nil {
 		e := fmt.Errorf("Unable to send funding request message: %v",
