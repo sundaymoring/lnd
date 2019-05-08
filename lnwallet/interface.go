@@ -53,6 +53,8 @@ var (
 type Utxo struct {
 	AddressType   AddressType
 	Value         btcutil.Amount
+	TokenValue	  btcutil.Amount
+	TokenId 	  wire.TokenId
 	Confirmations int64
 	PkScript      []byte
 	RedeemScript  []byte
