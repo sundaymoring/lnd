@@ -31,6 +31,19 @@ func TestChainSvrCmds(t *testing.T) {
 		unmarshalled interface{}
 	}{
 		{
+			name: "gettokeninfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("gettokeninfo", "ck")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetTokenInfoCmd("ck")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"gettokeninfo","params":["ck"],"id":1}`,
+			unmarshalled: &btcjson.GetTokenInfoCmd{
+				Symbol:      "ck",
+			},
+		},
+		{
 			name: "addnode",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("addnode", "127.0.0.1", btcjson.ANRemove)

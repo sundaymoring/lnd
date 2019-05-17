@@ -4821,7 +4821,7 @@ type QueryRoutesRequest struct {
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 
-	TokenId wire.Token
+	TokenId wire.TokenId
 }
 
 func (m *QueryRoutesRequest) Reset()         { *m = QueryRoutesRequest{} }

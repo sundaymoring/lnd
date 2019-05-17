@@ -1286,3 +1286,34 @@ func (c *BitcoindClient) filterTx(tx *wire.MsgTx,
 
 	return true, rec, nil
 }
+
+
+// though gettokeninfo
+func (c *BitcoindClient) GetTokenId(symbol string) (wire.TokenId, error)  {
+	tokenInfo,err := c.chainConn.client.GetTokenInfo(symbol)
+
+	if err != nil {
+		return wire.TokenId{}, err
+	}
+
+	if len(*tokenInfo) == 0 {
+		return wire.TokenId{}, errors.New("can not get token id of " + symbol)
+	}
+
+	for i := 0; i<len(*tokenInfo); i++ {
+		if (*tokenInfo)[i].Symbol == symbol {
+			t, err := wire.NewTokenIdFromStr((*tokenInfo)[i].Tokenid)
+			if err != nil {
+				return wire.TokenId{}, err
+			}
+			return *t, nil
+		}
+	}
+
+	return wire.TokenId{}, errors.New("can not get token id of " + symbol)
+}
+
+// HTODO implement function
+func (c *BitcoindClient) GetTokenSymbol(tokenId wire.TokenId) (string, error){
+	return "", nil
+}

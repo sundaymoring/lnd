@@ -143,7 +143,7 @@ func NewChannelReservation(capacity, fundingAmt btcutil.Amount,
 	fundingMSat := lnwire.NewMSatFromSatoshis(fundingAmt)
 	capacityMSat := lnwire.NewMSatFromSatoshis(capacity)
 	feeMSat := lnwire.NewMSatFromSatoshis(commitFee)
-	fundingFeeAmtMSat := lnwire.NewMSatFromSatoshis(fundingFeeAmt)
+//	fundingFeeAmtMSat := lnwire.NewMSatFromSatoshis(fundingFeeAmt)
 
 	// If we're the responder to a single-funder reservation, then we have
 	// no initial balance in the channel unless the remote party is pushing

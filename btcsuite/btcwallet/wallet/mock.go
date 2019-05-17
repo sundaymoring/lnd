@@ -79,3 +79,12 @@ func (m *mockChainClient) Notifications() <-chan interface{} {
 func (m *mockChainClient) BackEnd() string {
 	return "mock"
 }
+
+// HTODO implement function
+func (m *mockChainClient)GetTokenId(symbol string) (wire.TokenId, error) {
+	return wire.EmptyTokenId, nil
+}
+
+func (m *mockChainClient)GetTokenSymbol(tokenId wire.TokenId) (string, error) {
+	return "", nil
+}

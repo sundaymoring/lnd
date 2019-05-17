@@ -773,6 +773,17 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+//
+type GetTokenInfoCmd struct {
+	Symbol string
+}
+
+func NewGetTokenInfoCmd(symbol string) *GetTokenInfoCmd {
+	return &GetTokenInfoCmd{
+		Symbol:symbol,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -825,4 +836,5 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+	MustRegisterCmd("gettokeninfo", (*GetTokenInfoCmd)(nil), flags)
 }

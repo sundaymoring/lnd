@@ -480,7 +480,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 		// the fee rate passed in to perform coin selection.
 		err := l.selectCoinsAndChange(
 			req.FundingFeePerKw, req.FundingAmount, req.MinConfs,
-			reservation.ourContribution, req.TokenId, req.FundingFeeAmt,
+			reservation.ourContribution, &req.TokenId, req.FundingFeeAmt,
 		)
 		if err != nil {
 			req.err <- err

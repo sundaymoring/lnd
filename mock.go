@@ -191,6 +191,15 @@ func (*mockChainIO) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) 
 	return nil, nil
 }
 
+// HTODO implement function
+func (*mockChainIO) GetTokenId(symbol string) (*wire.TokenId, error){
+	return nil,nil
+}
+
+func (*mockChainIO)GetTokenSymbol(tokenId *wire.TokenId) (string, error){
+	return "", nil
+}
+
 // mockWalletController is used by the LightningWallet, and let us mock the
 // interaction with the bitcoin network.
 type mockWalletController struct {

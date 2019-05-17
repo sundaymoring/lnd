@@ -776,3 +776,13 @@ func (b *BtcWallet) IsSynced() (bool, int64, error) {
 
 	return true, bestTimestamp, nil
 }
+
+// HTODO implement function
+func (b *BtcWallet)GetTokenId(symbol string) (*wire.TokenId, error){
+	return nil,nil
+}
+
+func (b *BtcWallet)GetTokenSymbol(tokenId *wire.TokenId) (string, error){
+	return "", nil
+}
+

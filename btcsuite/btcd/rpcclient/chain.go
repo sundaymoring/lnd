@@ -927,3 +927,30 @@ func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
 	filterType wire.FilterType) (*wire.MsgCFHeaders, error) {
 	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }
+
+
+// GetTokenInfo
+type FutureGetTokenInfoResult chan *response
+
+func (r FutureGetTokenInfoResult) Receive() (*[]btcjson.GetTokenInfo, error){
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var tokenInfo []btcjson.GetTokenInfo
+	if err := json.Unmarshal(res, &tokenInfo); err != nil {
+		return nil, err
+	}
+	return &tokenInfo, nil
+}
+
+func (c *Client) GetTokenInfoAsyc(symbol string) FutureGetTokenInfoResult {
+	cmd := btcjson.NewGetTokenInfoCmd(symbol)
+	return c.sendCmd(cmd)
+}
+
+func (c *Client)GetTokenInfo(symbol string) (*[]btcjson.GetTokenInfo, error) {
+	return c.GetTokenInfoAsyc(symbol).Receive()
+}
+
