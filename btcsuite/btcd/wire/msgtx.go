@@ -108,7 +108,12 @@ const (
 	maxWitnessItemSize = 11000
 )
 
-const TokenIdSize = 36
+const (
+	TokenIdSize                      = 36
+	DefaultTokenTxVoutMinValue int64 = 0.0015
+	DefaultTokenCommitmentTxVoutValue int64 = DefaultTokenTxVoutMinValue * 500
+)
+
 type TokenId [TokenIdSize]byte
 var EmptyTokenId = TokenId{}
 

@@ -210,7 +210,7 @@ func CreateTestChannels() (*LightningChannel, *LightningChannel, func(), error) 
 
 	aliceCommitTx, bobCommitTx, err := CreateCommitmentTxns(channelBal,
 		channelBal, &aliceCfg, &bobCfg, aliceCommitPoint, bobCommitPoint,
-		*fundingTxIn)
+		*fundingTxIn, nil, 0, true)
 	if err != nil {
 		return nil, nil, nil, err
 	}

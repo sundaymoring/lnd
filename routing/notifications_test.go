@@ -93,6 +93,7 @@ func createChannelEdge(ctx *testCtx, bitcoinKey1, bitcoinKey2 []byte,
 		bitcoinKey1,
 		bitcoinKey2,
 		int64(chanValue),
+		nil,
 	)
 	if err != nil {
 		return nil, nil, nil, err

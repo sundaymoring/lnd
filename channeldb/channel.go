@@ -297,6 +297,12 @@ type ChannelCommitment struct {
 
 	// TODO(roasbeef): pending commit pointer?
 	//  * lets just walk through
+
+	LocalTokenBalance lnwire.MilliSatoshi
+
+	// RemoteBalance is the current available settled balance within the
+	// channel directly spendable by the remote node.
+	RemoteTokenBalance lnwire.MilliSatoshi
 }
 
 // ChannelStatus is a bit vector used to indicate whether an OpenChannel is in
@@ -515,10 +521,9 @@ type OpenChannel struct {
 
 	// for token
 	TokenId wire.TokenId
-	// If it's the token in the channel, the provider of the handling fee is the party creating the channel
-	FundingFeeAmt btcutil.Amount
+	// TokenCapacity is the total token capacity of this channel.
+	TokenCapacity btcutil.Amount
 	FundingTime uint32
-
 }
 
 // FullSync serializeputChanInfos, and writes to disk the *full* channel state, using
@@ -2150,6 +2155,10 @@ type ChannelSnapshot struct {
 	// ChannelCommitment is the current up-to-date commitment for the
 	// target channel.
 	ChannelCommitment
+
+	// for token
+	TokenId wire.TokenId
+	TokenCapacity btcutil.Amount
 }
 
 // Snapshot returns a read-only snapshot of the current channel state. This
@@ -2173,7 +2182,11 @@ func (c *OpenChannel) Snapshot() *ChannelSnapshot {
 			CommitHeight:  localCommit.CommitHeight,
 			CommitFee:     localCommit.CommitFee,
 		},
+		TokenCapacity:		c.TokenCapacity,
 	}
+
+	snapshot.TokenId.SetBytes(c.TokenId[:])
+
 
 	// Copy over the current set of HTLCs to ensure the caller can't mutate
 	// our internal state.
@@ -2424,7 +2437,7 @@ func putChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		channel.NumConfsRequired, channel.ChannelFlags,
 		channel.IdentityPub, channel.Capacity, channel.TotalMSatSent,
 		channel.TotalMSatReceived,
-		channel.TokenId, channel.FundingFeeAmt, channel.FundingTime,
+		channel.TokenId, channel.TokenCapacity, channel.FundingTime,
 	); err != nil {
 		return err
 	}
@@ -2451,7 +2464,7 @@ func serializeChanCommit(w io.Writer, c *ChannelCommitment) error {
 		c.CommitHeight, c.LocalLogIndex, c.LocalHtlcIndex,
 		c.RemoteLogIndex, c.RemoteHtlcIndex, c.LocalBalance,
 		c.RemoteBalance, c.CommitFee, c.FeePerKw, c.CommitTx,
-		c.CommitSig,
+		c.CommitSig, c.LocalTokenBalance, c.RemoteTokenBalance,
 	); err != nil {
 		return err
 	}
@@ -2545,7 +2558,7 @@ func fetchChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		&channel.NumConfsRequired, &channel.ChannelFlags,
 		&channel.IdentityPub, &channel.Capacity, &channel.TotalMSatSent,
 		&channel.TotalMSatReceived,
-		&channel.TokenId, &channel.FundingFeeAmt, &channel.FundingTime,
+		&channel.TokenId, &channel.TokenCapacity, &channel.FundingTime,
 	); err != nil {
 		return err
 	}
@@ -2576,6 +2589,7 @@ func deserializeChanCommit(r io.Reader) (ChannelCommitment, error) {
 		&c.CommitHeight, &c.LocalLogIndex, &c.LocalHtlcIndex, &c.RemoteLogIndex,
 		&c.RemoteHtlcIndex, &c.LocalBalance, &c.RemoteBalance,
 		&c.CommitFee, &c.FeePerKw, &c.CommitTx, &c.CommitSig,
+		&c.LocalTokenBalance, &c.RemoteTokenBalance,
 	)
 	if err != nil {
 		return c, err

@@ -62,7 +62,7 @@ const (
 	maxLtcPaymentMSat = lnwire.MilliSatoshi(math.MaxUint32) *
 		btcToLtcConversionRate
 
-	defaultTokenRemainFee = btcutil.Amount(1000000)
+	defaultTokenRemainFee = btcutil.Amount(wire.DefaultTokenCommitmentTxVoutValue * 2)
 )
 
 var (
@@ -1339,6 +1339,21 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 	rpcsLog.Debugf("[openchannel]: using fee of %v sat/kw for funding tx",
 		int64(feeRate))
 
+	tokenId, err := r.GetTokenIdWithSymbol(in.Symbol)
+	if err != nil {
+		return err
+	}
+
+	localFundingTokenAmt := btcutil.Amount(0)
+	remoteInitialTokenBalance := btcutil.Amount(0)
+	if *tokenId != wire.EmptyTokenId {
+		localFundingTokenAmt = localFundingAmt
+		remoteInitialTokenBalance = remoteInitialBalance
+
+		localFundingAmt = defaultTokenRemainFee
+		remoteInitialBalance = localFundingAmt / 2
+	}
+
 	// Instruct the server to trigger the necessary events to attempt to
 	// open a new channel. A stream is returned in place, this stream will
 	// be used to consume updates of the state of the pending channel.
@@ -1352,16 +1367,13 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		private:         in.Private,
 		remoteCsvDelay:  remoteCsvDelay,
 		minConfs:        minConfs,
+
+		localFundingTokenAmt: localFundingTokenAmt,
+		pushTokenAmt: lnwire.NewMSatFromSatoshis(remoteInitialTokenBalance),
 		fundingTime:	 uint32(time.Now().Unix()),
 	}
 
-	if tokenId, err := r.GetTokenIdWithSymbol(in.Symbol); err != nil {
-		return err
-	} else {
-		req.tokenId = *tokenId
-		req.fundingFeeAmt = defaultTokenRemainFee
-	}
-
+	req.tokenId.SetBytes(tokenId[:])
 	updateChan, errChan := r.server.OpenChannel(req)
 
 	var outpoint wire.OutPoint
@@ -1455,6 +1467,7 @@ func (r *rpcServer) OpenChannelSync(ctx context.Context,
 
 	localFundingAmt := btcutil.Amount(in.LocalFundingAmount)
 	remoteInitialBalance := btcutil.Amount(in.PushSat)
+
 	minHtlc := lnwire.MilliSatoshi(in.MinHtlcMsat)
 	remoteCsvDelay := uint16(in.RemoteCsvDelay)
 
@@ -1498,6 +1511,21 @@ func (r *rpcServer) OpenChannelSync(ctx context.Context,
 	rpcsLog.Tracef("[openchannel] target sat/kw for funding tx: %v",
 		int64(feeRate))
 
+	tokenId, err := r.GetTokenIdWithSymbol(in.Symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	localFundingTokenAmt := btcutil.Amount(0)
+	remoteInitialTokenBalance := btcutil.Amount(0)
+	if *tokenId != wire.EmptyTokenId {
+		localFundingTokenAmt = localFundingAmt
+		remoteInitialTokenBalance = remoteInitialBalance
+
+		localFundingAmt = defaultTokenRemainFee
+		remoteInitialBalance = localFundingAmt / 2
+	}
+
 	req := &openChanReq{
 		targetPubkey:    nodepubKey,
 		chainHash:       *activeNetParams.GenesisHash,
@@ -1508,15 +1536,11 @@ func (r *rpcServer) OpenChannelSync(ctx context.Context,
 		private:         in.Private,
 		remoteCsvDelay:  remoteCsvDelay,
 		minConfs:        minConfs,
+		localFundingTokenAmt: localFundingTokenAmt,
+		pushTokenAmt: lnwire.NewMSatFromSatoshis(remoteInitialTokenBalance),
 		fundingTime:	 uint32(time.Now().Unix()),
 	}
-
-	if tokenId, err := r.GetTokenIdWithSymbol(in.Symbol); err != nil {
-		return nil, err
-	} else {
-		req.tokenId = *tokenId
-		req.fundingFeeAmt = defaultTokenRemainFee
-	}
+	req.tokenId.SetBytes(tokenId[:])
 
 	updateChan, errChan := r.server.OpenChannel(req)
 	select {

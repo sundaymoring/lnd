@@ -7,11 +7,11 @@ import (
 
 const (
 	// CommitWeight is the weight of the base commitment transaction which
-	// includes: one p2wsh input, out p2wkh output, and one p2wsh output.
-	CommitWeight int64 = 724
+	// includes: one p2wsh input, out p2wkh output, and one p2wsh output, and two token fields.
+	CommitWeight int64 = 724 + (wire.TokenIdSize + 8) * 2
 
 	// HtlcWeight is the weight of an HTLC output.
-	HtlcWeight int64 = 172
+	HtlcWeight int64 = 172 + wire.TokenIdSize + 8
 )
 
 const (
@@ -44,25 +44,33 @@ const (
 	//      - value: 8 bytes
 	//      - var_int: 1 byte (pkscript_length)
 	//      - pkscript (p2pkh): 25 bytes
-	P2PKHOutputSize = 8 + 1 + 25
+	// 		- tokenId: 36 bytes
+	//		- tokenValue: 8 bytes
+	P2PKHOutputSize = 8 + 1 + 25 + wire.TokenIdSize + 8
 
 	// P2WKHOutputSize 31 bytes
 	//      - value: 8 bytes
 	//      - var_int: 1 byte (pkscript_length)
 	//      - pkscript (p2wpkh): 22 bytes
-	P2WKHOutputSize = 8 + 1 + P2WPKHSize
+	// 		- tokenId: 36 bytes
+	//		- tokenValue: 8 bytes
+	P2WKHOutputSize = 8 + 1 + P2WPKHSize + wire.TokenIdSize + 8
 
 	// P2WSHOutputSize 43 bytes
 	//      - value: 8 bytes
 	//      - var_int: 1 byte (pkscript_length)
 	//      - pkscript (p2wsh): 34 bytes
-	P2WSHOutputSize = 8 + 1 + P2WSHSize
+	// 		- tokenId: 36 bytes
+	//		- tokenValue: 8 bytes
+	P2WSHOutputSize = 8 + 1 + P2WSHSize + wire.TokenIdSize + 8
 
 	// P2SHOutputSize 32 bytes
 	//      - value: 8 bytes
 	//      - var_int: 1 byte (pkscript_length)
 	//      - pkscript (p2sh): 23 bytes
-	P2SHOutputSize = 8 + 1 + 23
+	// 		- tokenId: 36 bytes
+	//		- tokenValue: 8 bytes
+	P2SHOutputSize = 8 + 1 + 23 + wire.TokenIdSize + 8
 
 	// P2PKHScriptSigSize 108 bytes
 	//      - OP_DATA: 1 byte (signature length)
@@ -123,19 +131,25 @@ const (
 	//	- Value: 8 bytes
 	//	- VarInt: 1 byte (PkScript length)
 	//	- PkScript (P2WSH)
-	CommitmentDelayOutput = 8 + 1 + P2WSHSize
+	// 	- tokenId: 36 bytes
+	//	- tokenValue: 8 bytes
+	CommitmentDelayOutput = 8 + 1 + P2WSHSize + wire.TokenIdSize + 8
 
 	// CommitmentKeyHashOutput 31 bytes
 	//	- Value: 8 bytes
 	//	- VarInt: 1 byte (PkScript length)
 	//	- PkScript (P2WPKH)
-	CommitmentKeyHashOutput = 8 + 1 + P2WPKHSize
+	// 	- tokenId: 36 bytes
+	//	- tokenValue: 8 bytes
+	CommitmentKeyHashOutput = 8 + 1 + P2WPKHSize + wire.TokenIdSize + 8
 
 	// HTLCSize 43 bytes
 	//	- Value: 8 bytes
 	//	- VarInt: 1 byte (PkScript length)
 	//	- PkScript (PW2SH)
-	HTLCSize = 8 + 1 + P2WSHSize
+	// 	- tokenId: 36 bytes
+	//	- tokenValue: 8 bytes
+	HTLCSize = 8 + 1 + P2WSHSize + wire.TokenIdSize + 8
 
 	// WitnessHeaderSize 2 bytes
 	//	- Flag: 1 byte
@@ -173,11 +187,11 @@ const (
 
 	// HtlcTimeoutWeight is the weight of the HTLC timeout transaction
 	// which will transition an outgoing HTLC to the delay-and-claim state.
-	HtlcTimeoutWeight = 663
+	HtlcTimeoutWeight = 663  + wire.TokenIdSize + 8
 
 	// HtlcSuccessWeight is the weight of the HTLC success transaction
 	// which will transition an incoming HTLC to the delay-and-claim state.
-	HtlcSuccessWeight = 703
+	HtlcSuccessWeight = 703 + wire.TokenIdSize + 8
 
 	// MaxHTLCNumber is the maximum number HTLCs which can be included in a
 	// commitment transaction. This limit was chosen such that, in the case

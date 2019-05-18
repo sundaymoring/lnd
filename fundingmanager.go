@@ -112,6 +112,8 @@ type reservationWithCtx struct {
 
 	updates chan *lnrpc.OpenStatusUpdate
 	err     chan error
+
+	chanTokenAmt btcutil.Amount
 }
 
 // isLocked checks the reservation's timestamp to determine whether it is locked.
@@ -1276,7 +1278,7 @@ func (f *fundingManager) handleFundingAccept(fmsg *fundingAcceptMsg) {
 	maxValue := f.cfg.RequiredRemoteMaxValue(resCtx.chanAmt)
 	maxHtlcs := f.cfg.RequiredRemoteMaxHTLCs(resCtx.chanAmt)
 
-	// The remote node has responded with their portion of the channel
+	// The remote node has responded with their porFundingAmounttion of the channel
 	// contribution. At this point, we can process their contribution which
 	// allows us to construct and sign both the commitment transaction, and
 	// the funding transaction.
@@ -2713,9 +2715,19 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		localAmt       = msg.localFundingAmt
 		remoteAmt      = msg.remoteFundingAmt
 		capacity       = localAmt + remoteAmt
+
+		localTokenAmt  = msg.localFundingTokenAmt
+		tokenCapacity  = localTokenAmt
+
 		minHtlc        = msg.minHtlc
 		remoteCsvDelay = msg.remoteCsvDelay
+
+		realCapatity 	 = capacity
 	)
+
+	if msg.tokenId != wire.EmptyTokenId {
+		realCapatity = tokenCapacity
+	}
 
 	// We'll determine our dust limit depending on which chain is active.
 	var ourDustLimit btcutil.Amount
@@ -2727,9 +2739,11 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	}
 
 	fndgLog.Infof("Initiating fundingRequest(localAmt=%v, remoteAmt=%v, "+
-		"capacity=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v, tokenId=%v, fundingFeeAmt=%v)",
+		"capacity=%v, chainhash=%v, peer=%x, dustLimit=%v, min_confs=%v, tokenId=%v, +" +
+		"localTokenAmt=%v, remoteTokenAmt=%v, token_capacity=%v)",
 		localAmt, msg.pushAmt, capacity, msg.chainHash,
-		peerKey.SerializeCompressed(), ourDustLimit, msg.minConfs, msg.tokenId, msg.fundingFeeAmt)
+		peerKey.SerializeCompressed(), ourDustLimit, msg.minConfs,
+		msg.tokenId, msg.localFundingTokenAmt, msg.pushTokenAmt, tokenCapacity)
 
 	// First, we'll query the fee estimator for a fee that should get the
 	// commitment transaction confirmed by the next few blocks (conf target
@@ -2766,7 +2780,9 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		
 		// for token
 		TokenId:		 msg.tokenId,
-		FundingFeeAmt:   msg.fundingFeeAmt,
+		FundingTokenAmt: localTokenAmt,
+		PushTokenMSat:   msg.pushTokenAmt,
+		TokenCapacity:   tokenCapacity,
 		FundingTime:	 msg.fundingTime,
 	}
 
@@ -2787,7 +2803,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	// we'll use the RequiredRemoteDelay closure to compute the delay we
 	// require given the total amount of funds within the channel.
 	if remoteCsvDelay == 0 {
-		remoteCsvDelay = f.cfg.RequiredRemoteDelay(capacity)
+		remoteCsvDelay = f.cfg.RequiredRemoteDelay(realCapatity)
 	}
 
 	// If no minimum HTLC value was specified, use the default one.
@@ -2805,7 +2821,8 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	}
 
 	resCtx := &reservationWithCtx{
-		chanAmt:        capacity,
+		chanAmt:        req.Capacity,
+		chanTokenAmt:	req.TokenCapacity,
 		remoteCsvDelay: remoteCsvDelay,
 		remoteMinHtlc:  minHtlc,
 		reservation:    reservation,
@@ -2826,9 +2843,9 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	// Finally, we'll use the current value of the channels and our default
 	// policy to determine of required commitment constraints for the
 	// remote party.
-	chanReserve := f.cfg.RequiredRemoteChanReserve(capacity, ourDustLimit)
-	maxValue := f.cfg.RequiredRemoteMaxValue(capacity)
-	maxHtlcs := f.cfg.RequiredRemoteMaxHTLCs(capacity)
+	chanReserve := f.cfg.RequiredRemoteChanReserve(realCapatity, ourDustLimit)
+	maxValue := f.cfg.RequiredRemoteMaxValue(realCapatity)
+	maxHtlcs := f.cfg.RequiredRemoteMaxHTLCs(realCapatity)
 
 	fndgLog.Infof("Starting funding workflow with %v for pendingID(%x)",
 		msg.peer.Address(), chanID)
@@ -2854,7 +2871,8 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		ChannelFlags:         channelFlags,
 
 		TokenId:		 	  msg.tokenId,
-		FundingFeeAmt:   	  msg.fundingFeeAmt,
+		FundingTokenAmount:   tokenCapacity,
+		PushTokenAmount:   	  msg.pushTokenAmt,
 		FundingTime:		  msg.fundingTime,
 	}
 	if err := msg.peer.SendMessage(false, &fundingOpen); err != nil {

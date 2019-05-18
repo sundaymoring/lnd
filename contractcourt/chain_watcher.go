@@ -514,7 +514,11 @@ func (c *chainWatcher) toSelfAmount(tx *wire.MsgTx) btcutil.Amount {
 
 		for _, addr := range addrs {
 			if c.cfg.isOurAddr(addr) {
-				selfAmt += btcutil.Amount(txOut.Value)
+				if txOut.TokenId == wire.EmptyTokenId {
+					selfAmt += btcutil.Amount(txOut.Value)
+				} else {
+					selfAmt += btcutil.Amount(txOut.TokenValue)
+				}
 			}
 		}
 	}
@@ -629,8 +633,11 @@ func (c *chainWatcher) dispatchLocalForceClose(
 		closeSummary.TimeLockedBalance = chanSnapshot.LocalBalance.ToSatoshis()
 	}
 	for _, htlc := range forceClose.HtlcResolutions.OutgoingHTLCs {
-		htlcValue := btcutil.Amount(htlc.SweepSignDesc.Output.Value)
-		closeSummary.TimeLockedBalance += htlcValue
+		if chanSnapshot.TokenId == wire.EmptyTokenId {
+			closeSummary.TimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.Value)
+		} else {
+			closeSummary.TimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.TokenValue)
+		}
 	}
 
 	// Attempt to add a channel sync message to the close summary.

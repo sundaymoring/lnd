@@ -127,7 +127,8 @@ type OpenChannel struct {
 	// for token
 	TokenId wire.TokenId
 	// If it's the token in the channel, the provider of the handling fee is the party creating the channel
-	FundingFeeAmt btcutil.Amount
+	FundingTokenAmount btcutil.Amount
+	PushTokenAmount MilliSatoshi
 	FundingTime uint32
 }
 

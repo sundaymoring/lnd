@@ -36,7 +36,7 @@ var (
 
 // createHtlcSuccessTx creates a transaction that spends the output on the
 // commitment transaction of the peer that receives an HTLC. This transaction
-// essentially acts as an off-chain covenant as it's only permitted to spend
+// essentially acts as an off-chain covenanthe peer that re as it's only permitted to spend
 // the designated HTLC output, and also that spend can _only_ be used as a
 // state transition to create another output which actually allows redemption
 // or revocation of an HTLC.
@@ -46,7 +46,8 @@ var (
 //   * <0> <sender sig> <recvr sig> <preimage>
 func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	csvDelay uint32,
-	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, error) {
+	revocationKey, delayKey *btcec.PublicKey,
+	tokenId *wire.TokenId, tokenAmt btcutil.Amount) (*wire.MsgTx, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout).
@@ -57,6 +58,12 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	successTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: htlcOutput,
 	})
+
+	htlcTxOutIndex := 0
+	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+		AddTokenSendTxout(successTx, tokenId, int64(tokenAmt))
+		htlcTxOutIndex = 1
+	}
 
 	// Next, we'll generate the script used as the output for all second
 	// level HTLC which forces a covenant w.r.t what can be done with all
@@ -77,6 +84,12 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 		Value:    int64(htlcAmt),
 		PkScript: pkScript,
 	})
+
+	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+		successTx.TxOut[htlcTxOutIndex].TokenId.SetBytes(tokenId[:])
+		successTx.TxOut[htlcTxOutIndex].TokenValue = int64(tokenAmt)
+		successTx.TxOut[htlcTxOutIndex].Value =
+	}
 
 	return successTx, nil
 }
@@ -99,7 +112,8 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 // entirely pay for this (tiny: 1-in 1-out) transaction.
 func createHtlcTimeoutTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	cltvExpiry, csvDelay uint32,
-	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, error) {
+	revocationKey, delayKey *btcec.PublicKey,
+	tokenId *wire.TokenId, tokenAmt btcutil.Amount) (*wire.MsgTx, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout), and set the lock-time to the
@@ -132,6 +146,11 @@ func createHtlcTimeoutTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 		Value:    int64(htlcAmt),
 		PkScript: pkScript,
 	})
+
+	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+		timeoutTx.TxOut[0].TokenId.SetBytes(tokenId[:])
+		timeoutTx.TxOut[0].TokenValue = int64(tokenAmt)
+	}
 
 	return timeoutTx, nil
 }
