@@ -128,6 +128,8 @@ type Credit struct {
 	PkScript     []byte
 	Received     time.Time
 	FromCoinBase bool
+	TokenAmount  btcutil.Amount
+	TokenId 	 wire.TokenId
 }
 
 // Store implements a transaction store for storing and managing wallet
@@ -738,6 +740,9 @@ func (s *Store) UnspentOutputs(ns walletdb.ReadBucket) ([]Credit, error) {
 			PkScript:     txOut.PkScript,
 			Received:     rec.Received,
 			FromCoinBase: blockchain.IsCoinBaseTx(&rec.MsgTx),
+
+			TokenAmount:  btcutil.Amount(txOut.TokenValue),
+			TokenId:	  txOut.TokenId,
 		}
 		unspent = append(unspent, cred)
 		return nil
@@ -781,6 +786,9 @@ func (s *Store) UnspentOutputs(ns walletdb.ReadBucket) ([]Credit, error) {
 			PkScript:     txOut.PkScript,
 			Received:     rec.Received,
 			FromCoinBase: blockchain.IsCoinBaseTx(&rec.MsgTx),
+
+			TokenAmount:  btcutil.Amount(txOut.TokenValue),
+			TokenId: 	  txOut.TokenId,
 		}
 		unspent = append(unspent, cred)
 		return nil

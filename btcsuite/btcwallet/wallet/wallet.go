@@ -2636,6 +2636,8 @@ func (w *Wallet) ListUnspent(minconf, maxconf int32,
 				Amount:        output.Amount.ToBTC(),
 				Confirmations: int64(confs),
 				Spendable:     spendable,
+				TokenAmount:   output.TokenAmount.ToBTC(),
+				TokenId:	   output.TokenId.ToString(),
 			}
 
 			// BUG: this should be a JSON array so that all

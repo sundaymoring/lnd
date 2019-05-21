@@ -3,6 +3,7 @@ package btcwallet
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -364,9 +365,15 @@ func (b *BtcWallet) ListUnspentWitness(minConfs, maxConfs int32) (
 				return nil, err
 			}
 
+			tokenAmt, err := btcutil.NewAmount(output.TokenAmount)
+			if err != nil {
+				return nil, err
+			}
+
 			utxo := &lnwallet.Utxo{
 				AddressType: addressType,
 				Value:       amt,
+				TokenValue:  tokenAmt,
 				PkScript:    pkScript,
 				OutPoint: wire.OutPoint{
 					Hash:  *txid,
@@ -374,6 +381,10 @@ func (b *BtcWallet) ListUnspentWitness(minConfs, maxConfs int32) (
 				},
 				Confirmations: output.Confirmations,
 			}
+			if len(output.TokenId) != wire.TokenIdSize {
+				return nil, errors.New("token id length error")
+			}
+			copy(utxo.TokenId[:], []byte(output.TokenId))
 			witnessOutputs = append(witnessOutputs, utxo)
 		}
 
