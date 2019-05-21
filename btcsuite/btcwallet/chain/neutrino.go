@@ -700,3 +700,13 @@ out:
 	close(s.dequeueNotification)
 	s.wg.Done()
 }
+
+// HTODO complete function   GetTokenSymbol(tokenId wire.TokenId) (string, error)
+func (s *NeutrinoClient) GetTokenId(symbol string) (wire.TokenId, error) {
+	return wire.EmptyTokenId, nil
+}
+
+// HTODO complete function
+func (s *NeutrinoClient) GetTokenSymbol(tokenId wire.TokenId) (string, error){
+	return "", nil
+}

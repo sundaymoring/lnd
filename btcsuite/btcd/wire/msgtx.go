@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"io"
 	"strconv"
+	"encoding/hex"
 )
 
 const (
@@ -110,12 +111,15 @@ const (
 
 const (
 	TokenIdSize                      = 36
+	MaxTokenIdStringSize = TokenIdSize * 2
+
 	DefaultTokenTxVoutMinValue int64 = 0.0015
 	DefaultTokenCommitmentTxVoutValue int64 = DefaultTokenTxVoutMinValue * 500
 )
 
 type TokenId [TokenIdSize]byte
 var EmptyTokenId = TokenId{}
+var ErrTokenIdStrSize = fmt.Errorf("max tokenId string length is %v bytes", MaxTokenIdStringSize)
 
 func (tokenId *TokenId) SetBytes(newTokenId []byte) error {
 	nhlen := len(newTokenId)
@@ -140,6 +144,55 @@ func (tokenId *TokenId) IsEqual(target *TokenId) bool {
 
 func (tokenId *TokenId) IsValid() bool {
 	return *tokenId != EmptyTokenId
+}
+
+func (tokenid TokenId) ToString() string {
+	for i := 0; i < TokenIdSize/2; i++ {
+		tokenid[i], tokenid[TokenIdSize-1-i] = tokenid[TokenIdSize-1-i], tokenid[i]
+	}
+	return hex.EncodeToString(tokenid[:])
+}
+
+func NewTokenIdFromStr(tokenid string) (*TokenId, error) {
+	ret := new(TokenId)
+	err := TokenIdDecode(ret, tokenid)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func TokenIdDecode(dst *TokenId, src string) error {
+	// Return error if hash string is too long.
+	if len(src) > MaxTokenIdStringSize {
+		return ErrTokenIdStrSize
+	}
+
+	// Hex decoder expects the hash to be a multiple of two.  When not, pad
+	// with a leading zero.
+	var srcBytes []byte
+	if len(src)%2 == 0 {
+		srcBytes = []byte(src)
+	} else {
+		srcBytes = make([]byte, 1+len(src))
+		srcBytes[0] = '0'
+		copy(srcBytes[1:], src)
+	}
+
+	// Hex decode the source bytes to a temporary destination.
+	var reversedTokenId TokenId
+	_, err := hex.Decode(reversedTokenId[TokenIdSize-hex.DecodedLen(len(srcBytes)):], srcBytes)
+	if err != nil {
+		return err
+	}
+
+	// Reverse copy from the temporary hash to destination.  Because the
+	// temporary was zeroed, the written result will be correctly padded.
+	for i, b := range reversedTokenId[:TokenIdSize/2] {
+		dst[i], dst[TokenIdSize-1-i] = reversedTokenId[TokenIdSize-1-i], b
+	}
+
+	return nil
 }
 
 // witnessMarkerBytes are a pair of bytes specific to the witness encoding. If

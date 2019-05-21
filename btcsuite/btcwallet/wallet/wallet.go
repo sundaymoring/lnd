@@ -3624,3 +3624,12 @@ func Open(db walletdb.DB, pubPass []byte, cbs *waddrmgr.OpenCallbacks,
 
 	return w, nil
 }
+
+// HTODO implement function
+func (w *Wallet)GetTokenId(symbol string) (*wire.TokenId, error){
+	return nil,nil
+}
+
+func (w *Wallet)GetTokenSymbol(tokenId *wire.TokenId) (string, error){
+	return "", nil
+}

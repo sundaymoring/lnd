@@ -548,3 +548,16 @@ type ValidateAddressChainResult struct {
 	IsValid bool   `json:"isvalid"`
 	Address string `json:"address,omitempty"`
 }
+
+// GetTokenInfo models the data returned by the chain server gettokeninfo command.
+type GetTokenInfo struct {
+	Symbol string `json:"symbol"`
+	Supply float64 `json:"supply"`
+	Type int32 `json:"type"`
+	Name string `json:"name"`
+	Url string `json:"url"`
+	Description string `json:"description"`
+	Address string `json:"address"`
+	Txid string `json:"txid"`
+	Tokenid string `json:"tokenid"`
+}

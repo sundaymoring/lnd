@@ -445,3 +445,12 @@ func (c *RPCClient) POSTClient() (*rpcclient.Client, error) {
 	configCopy.HTTPPostMode = true
 	return rpcclient.New(&configCopy, nil)
 }
+
+// HTODO complete function
+func (c *RPCClient) GetTokenId(symbol string) (wire.TokenId, error)  {
+	return wire.EmptyTokenId, nil
+}
+// HTODO complete function
+func (c *RPCClient) GetTokenSymbol(tokenId wire.TokenId) (string, error)  {
+	return "", nil
+}

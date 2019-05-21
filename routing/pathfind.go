@@ -3,8 +3,6 @@ package routing
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"math"
 
 	"container/heap"
@@ -431,7 +429,7 @@ type RestrictParams struct {
 // that need to be paid along the path and accurately check the amount
 // to forward at every node against the available bandwidth.
 func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
-	amt lnwire.MilliSatoshi, tokenId wire.TokenId, tokenMaxFee btcutil.Amount) ([]*channeldb.ChannelEdgePolicy, error) {
+	amt lnwire.MilliSatoshi/*, tokenId wire.TokenId, tokenMaxFee btcutil.Amount*/) ([]*channeldb.ChannelEdgePolicy, error) {
 
 	var err error
 	tx := g.tx
@@ -503,7 +501,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		node:            targetNode,
 		amountToReceive: amt,
 		fee:             0,
-		tokenId: 		 tokenId,
+		/*tokenId: 		 tokenId,*/
 	}
 
 	// We'll use this map as a series of "next" hop pointers. So to get
@@ -524,7 +522,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 	// satisfy our specific requirements.
 	processEdge := func(fromNode *channeldb.LightningNode,
 		edge *channeldb.ChannelEdgePolicy,
-		bandwidth lnwire.MilliSatoshi, tokenId wire.TokenId, toNode Vertex) {
+		bandwidth lnwire.MilliSatoshi, /*tokenId wire.TokenId,*/ toNode Vertex) {
 
 		fromVertex := Vertex(fromNode.PubKeyBytes)
 
@@ -563,10 +561,12 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 
 		toNodeDist := distance[toNode]
 
+		/*
 		// check tokenid consistency
 		if tokenId != toNodeDist.tokenId {
 			return
 		}
+		*/
 
 		amountToSend := toNodeDist.amountToReceive
 
