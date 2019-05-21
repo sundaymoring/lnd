@@ -47,7 +47,7 @@ var (
 func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	csvDelay uint32,
 	revocationKey, delayKey *btcec.PublicKey,
-	tokenId *wire.TokenId, tokenAmt btcutil.Amount) (*wire.MsgTx, error) {
+	tokenId *wire.TokenId, htlcTokenAmt btcutil.Amount) (*wire.MsgTx, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout).
@@ -59,10 +59,8 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 		PreviousOutPoint: htlcOutput,
 	})
 
-	htlcTxOutIndex := 0
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
-		AddTokenSendTxout(successTx, tokenId, int64(tokenAmt))
-		htlcTxOutIndex = 1
+	if tokenId != nil && tokenId.IsValid() {
+		AddTokenSendTxout(successTx, tokenId, int64(htlcTokenAmt))
 	}
 
 	// Next, we'll generate the script used as the output for all second
@@ -80,16 +78,15 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 
 	// Finally, the output is simply the amount of the HTLC (minus the
 	// required fees), paying to the timeout script.
-	successTx.AddTxOut(&wire.TxOut{
+	out := &wire.TxOut{
 		Value:    int64(htlcAmt),
 		PkScript: pkScript,
-	})
-
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
-		successTx.TxOut[htlcTxOutIndex].TokenId.SetBytes(tokenId[:])
-		successTx.TxOut[htlcTxOutIndex].TokenValue = int64(tokenAmt)
-		successTx.TxOut[htlcTxOutIndex].Value =
 	}
+	if tokenId != nil && tokenId.IsValid() {
+		out.TokenId.SetBytes(tokenId[:])
+		out.TokenValue = int64(htlcTokenAmt)
+	}
+	successTx.AddTxOut(out)
 
 	return successTx, nil
 }
@@ -113,7 +110,7 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 func createHtlcTimeoutTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	cltvExpiry, csvDelay uint32,
 	revocationKey, delayKey *btcec.PublicKey,
-	tokenId *wire.TokenId, tokenAmt btcutil.Amount) (*wire.MsgTx, error) {
+	tokenId *wire.TokenId, htlcTokenAmt btcutil.Amount) (*wire.MsgTx, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout), and set the lock-time to the
@@ -142,15 +139,17 @@ func createHtlcTimeoutTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 
 	// Finally, the output is simply the amount of the HTLC (minus the
 	// required fees), paying to the regular second level HTLC script.
-	timeoutTx.AddTxOut(&wire.TxOut{
+	out := &wire.TxOut{
 		Value:    int64(htlcAmt),
 		PkScript: pkScript,
-	})
-
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
-		timeoutTx.TxOut[0].TokenId.SetBytes(tokenId[:])
-		timeoutTx.TxOut[0].TokenValue = int64(tokenAmt)
 	}
+	if tokenId != nil && tokenId.IsValid() {
+		out.TokenId.SetBytes(tokenId[:])
+		out.TokenValue = int64(htlcTokenAmt)
+
+		AddTokenSendTxout(timeoutTx, tokenId, int64(htlcTokenAmt))
+	}
+	timeoutTx.AddTxOut(out)
 
 	return timeoutTx, nil
 }

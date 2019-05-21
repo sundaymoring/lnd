@@ -176,7 +176,7 @@ func (w *Wallet) txToOutputs(outputs []*wire.TxOut, account uint32,
 		return nil, err
 	}
 
-	err = validateMsgTx(tx.Tx, tx.PrevScripts, tx.PrevInputValues)
+	err = validateMsgTx(tx.Tx, tx.PrevScripts, tx.PrevInputValues, tx.PrevInputTokenIds, tx.PrevInputTokenValues)
 	if err != nil {
 		return nil, err
 	}
@@ -267,11 +267,12 @@ func (w *Wallet) findEligibleOutputs(dbtx walletdb.ReadTx, account uint32, minco
 // validateMsgTx verifies transaction input scripts for tx.  All previous output
 // scripts from outputs redeemed by the transaction, in the same order they are
 // spent, must be passed in the prevScripts slice.
-func validateMsgTx(tx *wire.MsgTx, prevScripts [][]byte, inputValues []btcutil.Amount) error {
+func validateMsgTx(tx *wire.MsgTx, prevScripts [][]byte, inputValues []btcutil.Amount,
+	inputTokenIds []*wire.TokenId, inputTokenValues []btcutil.Amount) error {
 	hashCache := txscript.NewTxSigHashes(tx)
 	for i, prevScript := range prevScripts {
 		vm, err := txscript.NewEngine(prevScript, tx, i,
-			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i]), wire.EmptyTokenId[:], 0)
+			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i]), inputTokenIds[i][:], int64(inputTokenValues[i]))
 		if err != nil {
 			return fmt.Errorf("cannot create script engine: %s", err)
 		}

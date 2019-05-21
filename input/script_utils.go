@@ -60,7 +60,8 @@ func GenMultiSigScript(aPub, bPub []byte) ([]byte, error) {
 
 // GenFundingPkScript creates a redeem script, and its matching p2wsh
 // output for the funding transaction.
-func GenFundingPkScript(aPub, bPub []byte, amt int64, tokenId* wire.TokenId) ([]byte, *wire.TxOut, error) {
+func GenFundingPkScript(aPub, bPub []byte, amt int64,
+	tokenId* wire.TokenId, tokenAmt int64) ([]byte, *wire.TxOut, error) {
 	// As a sanity check, ensure that the passed amount is above zero.
 	if amt <= 0 {
 		return nil, nil, fmt.Errorf("can't create FundTx script with " +
@@ -81,10 +82,9 @@ func GenFundingPkScript(aPub, bPub []byte, amt int64, tokenId* wire.TokenId) ([]
 	}
 
 	out := wire.NewTxOut(amt, pkScript)
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+	if tokenId != nil && tokenId.IsValid() && tokenAmt > 0 {
 		out.TokenId.SetBytes(tokenId[:])
-		out.TokenValue = out.Value
-		out.Value = wire.DefaultTokenTxVoutMinValue
+		out.TokenValue = tokenAmt
 	}
 	return witnessScript, out, nil
 }

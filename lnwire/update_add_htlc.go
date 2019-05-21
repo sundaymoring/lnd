@@ -28,6 +28,7 @@ type UpdateAddHTLC struct {
 
 	// Amount is the amount of millisatoshis this HTLC is worth.
 	Amount MilliSatoshi
+	TokenAmount MilliSatoshi
 
 	// PaymentHash is the payment hash to be included in the HTLC this
 	// request creates. The pre-image to this HTLC must be revealed by the
@@ -70,6 +71,7 @@ func (c *UpdateAddHTLC) Decode(r io.Reader, pver uint32) error {
 		&c.ChanID,
 		&c.ID,
 		&c.Amount,
+		&c.TokenAmount,
 		c.PaymentHash[:],
 		&c.Expiry,
 		c.OnionBlob[:],
@@ -85,6 +87,7 @@ func (c *UpdateAddHTLC) Encode(w io.Writer, pver uint32) error {
 		c.ChanID,
 		c.ID,
 		c.Amount,
+		c.TokenAmount,
 		c.PaymentHash[:],
 		c.Expiry,
 		c.OnionBlob[:],
@@ -105,5 +108,5 @@ func (c *UpdateAddHTLC) MsgType() MessageType {
 // This is part of the lnwire.Message interface.
 func (c *UpdateAddHTLC) MaxPayloadLength(uint32) uint32 {
 	// 1450
-	return 32 + 8 + 4 + 8 + 32 + 1366
+	return 32 + 8 + 8 + 4 + 8 + 32 + 1366
 }

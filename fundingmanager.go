@@ -102,6 +102,7 @@ type reservationWithCtx struct {
 	peer        lnpeer.Peer
 
 	chanAmt btcutil.Amount
+	chanTokenAmt btcutil.Amount
 
 	// Constraints we require for the remote.
 	remoteCsvDelay uint16
@@ -112,8 +113,6 @@ type reservationWithCtx struct {
 
 	updates chan *lnrpc.OpenStatusUpdate
 	err     chan error
-
-	chanTokenAmt btcutil.Amount
 }
 
 // isLocked checks the reservation's timestamp to determine whether it is locked.
@@ -540,6 +539,8 @@ func (f *fundingManager) Start() error {
 					RemoteCurrentRevocation: ch.RemoteCurrentRevocation,
 					RemoteNextRevocation:    ch.RemoteNextRevocation,
 					LocalChanConfig:         ch.LocalChanCfg,
+					TokenCapacity:			 ch.TokenCapacity,
+					TokenSettledBalance: 	 ch.LocalCommitment.LocalTokenBalance.ToSatoshis(),
 				}
 
 				if err := ch.CloseChannel(closeInfo); err != nil {
@@ -748,6 +749,10 @@ type pendingChannel struct {
 	capacity      btcutil.Amount
 	localBalance  btcutil.Amount
 	remoteBalance btcutil.Amount
+
+	tokenCapacity      btcutil.Amount
+	tokenLocalBalance  btcutil.Amount
+	tokenRemoteBalance btcutil.Amount
 }
 
 type pendingChansReq struct {
@@ -937,6 +942,9 @@ func (f *fundingManager) handlePendingChannels(msg *pendingChansReq) {
 			capacity:      dbPendingChan.Capacity,
 			localBalance:  dbPendingChan.LocalCommitment.LocalBalance.ToSatoshis(),
 			remoteBalance: dbPendingChan.LocalCommitment.RemoteBalance.ToSatoshis(),
+			tokenCapacity:      dbPendingChan.TokenCapacity,
+			tokenLocalBalance:  dbPendingChan.LocalCommitment.LocalTokenBalance.ToSatoshis(),
+			tokenRemoteBalance: dbPendingChan.LocalCommitment.RemoteTokenBalance.ToSatoshis(),
 		}
 
 		pendingChannels = append(pendingChannels, pendingChan)
@@ -1021,7 +1029,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 
 	// We'll reject any request to create a channel that's above the
 	// current soft-limit for channel size.
-	if msg.FundingAmount > maxFundingAmount {
+	if msg.FundingAmount > maxFundingAmount || msg.FundingTokenAmount > maxFundingAmount {
 		f.failFundingFlow(
 			fmsg.peer, fmsg.msg.PendingChannelID,
 			lnwire.ErrChanTooLarge,
@@ -1031,25 +1039,25 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 
 	// We'll, also ensure that the remote party isn't attempting to propose
 	// a channel that's below our current min channel size.
-	if amt < f.cfg.MinChanSize {
+	if msg.FundingAmount < f.cfg.MinChanSize {
 		f.failFundingFlow(
 			fmsg.peer, fmsg.msg.PendingChannelID,
-			lnwallet.ErrChanTooSmall(amt, btcutil.Amount(f.cfg.MinChanSize)),
+			lnwallet.ErrChanTooSmall(msg.FundingAmount, btcutil.Amount(f.cfg.MinChanSize)),
 		)
 		return
 	}
 
 	// If request specifies non-zero push amount and 'rejectpush' is set,
 	// signal an error.
-	if cfg.RejectPush && msg.PushAmount > 0 {
+	if cfg.RejectPush && (msg.PushAmount > 0 || msg.PushTokenAmount > 0) {
 		f.failFundingFlow(
 			fmsg.peer, fmsg.msg.PendingChannelID,
 			lnwallet.ErrNonZeroPushAmount())
 		return
 	}
 
-	fndgLog.Infof("Recv'd fundingRequest(amt=%v, push=%v, tokenId=%v, fundingFeeAmt=%v, delay=%v, "+
-		"pendingId=%x) from peer(%x)", amt, msg.PushAmount, msg.TokenId, msg.FundingFeeAmt,
+	fndgLog.Infof("Recv'd fundingRequest(amt=%v, push=%v, tokenId=%v, fundingTokenAmt=%v, pushToken=%v, delay=%v, "+
+		"pendingId=%x) from peer(%x)", msg.FundingAmount, msg.PushAmount, msg.TokenId, msg.FundingTokenAmount, msg.PushTokenAmount,
 		msg.CsvDelay, msg.PendingChannelID,
 		fmsg.peer.IdentityKey().SerializeCompressed())
 
@@ -1064,16 +1072,17 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 		NodeID:          fmsg.peer.IdentityKey(),
 		NodeAddr:        fmsg.peer.Address(),
 		FundingAmount:   0,
-		Capacity:        amt,
+		Capacity:        msg.FundingAmount,
 		CommitFeePerKw:  lnwallet.SatPerKWeight(msg.FeePerKiloWeight),
 		FundingFeePerKw: 0,
 		PushMSat:        msg.PushAmount,
 		Flags:           msg.ChannelFlags,
 		MinConfs:        1,
-		TokenId: 		 msg.TokenId,
-		FundingFeeAmt:   msg.FundingFeeAmt,
-		FundingTime:	 msg.FundingTime,
+		FundingTokenAmt: 0,
+		TokenCapacity: 	 msg.FundingTokenAmount,
+		PushTokenMSat:   msg.PushTokenAmount,
 	}
+	req.TokenId.SetBytes(msg.TokenId[:])
 
 	reservation, err := f.cfg.Wallet.InitChannelReservation(req)
 	if err != nil {
@@ -1108,8 +1117,8 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 	}
 
 	fndgLog.Infof("Requiring %v confirmations for pendingChan(%x): "+
-		"amt=%v, push_amt=%v", numConfsReq, fmsg.msg.PendingChannelID,
-		amt, msg.PushAmount)
+		"amt=%v, push_amt=%v, tokenAmt=%v, pushTokenAmt", numConfsReq, fmsg.msg.PendingChannelID,
+		amt, msg.PushAmount, msg.FundingTokenAmount, msg.PushTokenAmount)
 
 	// Generate our required constraints for the remote party.
 	remoteCsvDelay := f.cfg.RequiredRemoteDelay(amt)
@@ -1127,11 +1136,12 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 	}
 	resCtx := &reservationWithCtx{
 		reservation:    reservation,
-		chanAmt:        amt,
+		chanAmt:        msg.FundingAmount,
 		remoteCsvDelay: remoteCsvDelay,
 		remoteMinHtlc:  minHtlc,
 		err:            make(chan error, 1),
 		peer:           fmsg.peer,
+		chanTokenAmt: 	msg.FundingTokenAmount,
 	}
 	f.activeReservations[peerIDKey][msg.PendingChannelID] = resCtx
 	f.resMtx.Unlock()
@@ -1142,7 +1152,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 	// With our parameters set, we'll now process their contribution so we
 	// can move the funding workflow ahead.
 	remoteContribution := &lnwallet.ChannelContribution{
-		FundingAmount:        amt,
+		FundingAmount:        msg.FundingAmount,
 		FirstCommitmentPoint: msg.FirstCommitmentPoint,
 		ChannelConfig: &channeldb.ChannelConfig{
 			ChannelConstraints: channeldb.ChannelConstraints{
@@ -1169,6 +1179,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 				PubKey: copyPubKey(msg.HtlcPoint),
 			},
 		},
+		FundingTokenAmount: msg.FundingTokenAmount,
 	}
 	err = reservation.ProcessSingleContribution(remoteContribution)
 	if err != nil {
@@ -1427,6 +1438,7 @@ func (f *fundingManager) handleFundingCreated(fmsg *fundingCreatedMsg) {
 	// from the database.
 	deleteFromDatabase := func() {
 		localBalance := completeChan.LocalCommitment.LocalBalance.ToSatoshis()
+		localTokenBalance := completeChan.LocalCommitment.LocalTokenBalance.ToSatoshis()
 		closeInfo := &channeldb.ChannelCloseSummary{
 			ChanPoint:               completeChan.FundingOutpoint,
 			ChainHash:               completeChan.ChainHash,
@@ -1437,6 +1449,8 @@ func (f *fundingManager) handleFundingCreated(fmsg *fundingCreatedMsg) {
 			RemoteCurrentRevocation: completeChan.RemoteCurrentRevocation,
 			RemoteNextRevocation:    completeChan.RemoteNextRevocation,
 			LocalChanConfig:         completeChan.LocalChanCfg,
+			TokenCapacity:  		 completeChan.TokenCapacity,
+			TokenSettledBalance:  	 localTokenBalance,
 		}
 
 		if err := completeChan.CloseChannel(closeInfo); err != nil {
@@ -2721,13 +2735,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 
 		minHtlc        = msg.minHtlc
 		remoteCsvDelay = msg.remoteCsvDelay
-
-		realCapatity 	 = capacity
 	)
-
-	if msg.tokenId != wire.EmptyTokenId {
-		realCapatity = tokenCapacity
-	}
 
 	// We'll determine our dust limit depending on which chain is active.
 	var ourDustLimit btcutil.Amount
@@ -2783,7 +2791,6 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 		FundingTokenAmt: localTokenAmt,
 		PushTokenMSat:   msg.pushTokenAmt,
 		TokenCapacity:   tokenCapacity,
-		FundingTime:	 msg.fundingTime,
 	}
 
 	reservation, err := f.cfg.Wallet.InitChannelReservation(req)
@@ -2803,7 +2810,7 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	// we'll use the RequiredRemoteDelay closure to compute the delay we
 	// require given the total amount of funds within the channel.
 	if remoteCsvDelay == 0 {
-		remoteCsvDelay = f.cfg.RequiredRemoteDelay(realCapatity)
+		remoteCsvDelay = f.cfg.RequiredRemoteDelay(capacity)
 	}
 
 	// If no minimum HTLC value was specified, use the default one.
@@ -2843,9 +2850,9 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	// Finally, we'll use the current value of the channels and our default
 	// policy to determine of required commitment constraints for the
 	// remote party.
-	chanReserve := f.cfg.RequiredRemoteChanReserve(realCapatity, ourDustLimit)
-	maxValue := f.cfg.RequiredRemoteMaxValue(realCapatity)
-	maxHtlcs := f.cfg.RequiredRemoteMaxHTLCs(realCapatity)
+	chanReserve := f.cfg.RequiredRemoteChanReserve(capacity, ourDustLimit)
+	maxValue := f.cfg.RequiredRemoteMaxValue(capacity)
+	maxHtlcs := f.cfg.RequiredRemoteMaxHTLCs(capacity)
 
 	fndgLog.Infof("Starting funding workflow with %v for pendingID(%x)",
 		msg.peer.Address(), chanID)

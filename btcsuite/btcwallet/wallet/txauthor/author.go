@@ -52,6 +52,10 @@ type AuthoredTx struct {
 	PrevInputValues []btcutil.Amount
 	TotalInput      btcutil.Amount
 	ChangeIndex     int // negative if no change
+
+	PrevInputTokenIds 	 []*wire.TokenId
+	PrevInputTokenValues []btcutil.Amount
+	TotalTokenInput      btcutil.Amount
 }
 
 // ChangeSource provides P2PKH change output scripts for transaction creation.
@@ -190,13 +194,16 @@ type SecretsSource interface {
 // inputs.  Private keys and redeem scripts are looked up using a SecretsSource
 // based on the previous output script.
 func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []btcutil.Amount,
-	secrets SecretsSource) error {
+	secrets SecretsSource, inputTokenIds[]*wire.TokenId, inputTokenValues []btcutil.Amount) error {
 
 	inputs := tx.TxIn
 	hashCache := txscript.NewTxSigHashes(tx)
 	chainParams := secrets.ChainParams()
 
-	if len(inputs) != len(prevPkScripts) {
+	if len(inputs) != len(prevPkScripts) ||
+		len(inputs) != len(inputValues) ||
+		len(inputs) != len(inputTokenIds) ||
+		len(inputs) != len(inputTokenValues) {
 		return errors.New("tx.TxIn and prevPkScripts slices must " +
 			"have equal length")
 	}
@@ -212,14 +219,14 @@ func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []bt
 		case txscript.IsPayToScriptHash(pkScript):
 			err := spendNestedWitnessPubKeyHash(inputs[i], pkScript,
 				int64(inputValues[i]), chainParams, secrets,
-				tx, hashCache, i)
+				tx, hashCache, i, inputTokenIds[i], int64(inputTokenValues[i]))
 			if err != nil {
 				return err
 			}
 		case txscript.IsPayToWitnessPubKeyHash(pkScript):
 			err := spendWitnessKeyHash(inputs[i], pkScript,
 				int64(inputValues[i]), chainParams, secrets,
-				tx, hashCache, i)
+				tx, hashCache, i, inputTokenIds[i], int64(inputTokenValues[i]))
 			if err != nil {
 				return err
 			}
@@ -245,7 +252,8 @@ func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []bt
 // the input value in the sighash.
 func spendWitnessKeyHash(txIn *wire.TxIn, pkScript []byte,
 	inputValue int64, chainParams *chaincfg.Params, secrets SecretsSource,
-	tx *wire.MsgTx, hashCache *txscript.TxSigHashes, idx int) error {
+	tx *wire.MsgTx, hashCache *txscript.TxSigHashes, idx int,
+	tokenId *wire.TokenId, inputTokenValue int64) error {
 
 	// First obtain the key pair associated with this p2wkh address.
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(pkScript,
@@ -279,8 +287,14 @@ func spendWitnessKeyHash(txIn *wire.TxIn, pkScript []byte,
 	if err != nil {
 		return err
 	}
+
+	if tokenId == nil {
+		tokenId = &wire.EmptyTokenId
+		inputTokenValue = 0
+	}
+
 	witnessScript, err := txscript.WitnessSignature(tx, hashCache, idx,
-		inputValue, witnessProgram, txscript.SigHashAll, privKey, true, wire.EmptyTokenId[:], 0)
+		inputValue, witnessProgram, txscript.SigHashAll, privKey, true, tokenId[:], inputTokenValue)
 	if err != nil {
 		return err
 	}
@@ -299,7 +313,8 @@ func spendWitnessKeyHash(txIn *wire.TxIn, pkScript []byte,
 // digest algorithm defined in BIP0143 includes the input value in the sighash.
 func spendNestedWitnessPubKeyHash(txIn *wire.TxIn, pkScript []byte,
 	inputValue int64, chainParams *chaincfg.Params, secrets SecretsSource,
-	tx *wire.MsgTx, hashCache *txscript.TxSigHashes, idx int) error {
+	tx *wire.MsgTx, hashCache *txscript.TxSigHashes, idx int,
+	tokenId *wire.TokenId, inputTokenValue int64) error {
 
 	// First we need to obtain the key pair related to this p2sh output.
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(pkScript,
@@ -340,10 +355,15 @@ func spendNestedWitnessPubKeyHash(txIn *wire.TxIn, pkScript []byte,
 	}
 	txIn.SignatureScript = sigScript
 
+	if tokenId == nil {
+		tokenId = &wire.EmptyTokenId
+		inputTokenValue = 0
+	}
+
 	// With the sigScript in place, we'll next generate the proper witness
 	// that'll allow us to spend the p2wkh output.
 	witnessScript, err := txscript.WitnessSignature(tx, hashCache, idx,
-		inputValue, witnessProgram, txscript.SigHashAll, privKey, compressed, wire.EmptyTokenId[:], 0)
+		inputValue, witnessProgram, txscript.SigHashAll, privKey, compressed, tokenId[:], inputTokenValue)
 	if err != nil {
 		return err
 	}
@@ -357,5 +377,5 @@ func spendNestedWitnessPubKeyHash(txIn *wire.TxIn, pkScript []byte,
 // for each input of an authored transaction.  Private keys and redeem scripts
 // are looked up using a SecretsSource based on the previous output script.
 func (tx *AuthoredTx) AddAllInputScripts(secrets SecretsSource) error {
-	return AddAllInputScripts(tx.Tx, tx.PrevScripts, tx.PrevInputValues, secrets)
+	return AddAllInputScripts(tx.Tx, tx.PrevScripts, tx.PrevInputValues, secrets, tx.PrevInputTokenIds, tx.PrevInputTokenValues)
 }

@@ -116,8 +116,6 @@ type InitFundingReserveMsg struct {
 	FundingTokenAmt 	btcutil.Amount
 	PushTokenMSat 		lnwire.MilliSatoshi
 	TokenCapacity 		btcutil.Amount
-
-	FundingTime uint32
 }
 
 // fundingReserveCancelMsg is a message reserved for cancelling an existing
@@ -439,7 +437,7 @@ func (l *LightningWallet) InitChannelReservation(
 func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg) {
 	// It isn't possible to create a channel with zero funds committed.
 	if req.FundingAmount+req.Capacity == 0 ||
-		(req.TokenId != wire.EmptyTokenId && req.FundingTokenAmt+req.TokenCapacity == 0) {
+		(req.TokenId.IsValid() && req.FundingTokenAmt+req.TokenCapacity == 0) {
 		err := ErrZeroCapacity()
 		req.err <- err
 		req.resp <- nil
@@ -462,7 +460,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	reservation, err := NewChannelReservation(
 		req.Capacity, req.FundingAmount, req.CommitFeePerKw, l, id,
 		req.PushMSat, l.Cfg.NetParams.GenesisHash, req.Flags,
-		req.TokenId, req.TokenCapacity, req.FundingTokenAmt, req.PushTokenMSat, req.FundingTime,
+		req.TokenId, req.TokenCapacity, req.FundingTokenAmt, req.PushTokenMSat,
 	)
 	if err != nil {
 		req.err <- err
@@ -641,7 +639,7 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 	ourChanCfg, theirChanCfg *channeldb.ChannelConfig,
 	localCommitPoint, remoteCommitPoint *btcec.PublicKey,
 	fundingTxIn wire.TxIn, tokenId *wire.TokenId,
-	localBalance, remoteBalance btcutil.Amount) (*wire.MsgTx, *wire.MsgTx, error) {
+	localTokenBalance, remoteTokenBalance btcutil.Amount) (*wire.MsgTx, *wire.MsgTx, error) {
 
 	localCommitmentKeys := deriveCommitmentKeys(localCommitPoint, true,
 		ourChanCfg, theirChanCfg)
@@ -650,7 +648,7 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 
 	ourCommitTx, err := CreateCommitTx(fundingTxIn, localCommitmentKeys,
 		uint32(ourChanCfg.CsvDelay), localBalance, remoteBalance,
-		ourChanCfg.DustLimit, tokenId, fundingFeeAmount, isInitiator)
+		ourChanCfg.DustLimit, tokenId, localTokenBalance, remoteTokenBalance)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -662,7 +660,7 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 
 	theirCommitTx, err := CreateCommitTx(fundingTxIn, remoteCommitmentKeys,
 		uint32(theirChanCfg.CsvDelay), remoteBalance, localBalance,
-		theirChanCfg.DustLimit, tokenId, fundingFeeAmount, !isInitiator)
+		theirChanCfg.DustLimit, tokenId, remoteTokenBalance, localTokenBalance)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -712,6 +710,12 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	for _, theirInput := range theirContribution.Inputs {
 		fundingTx.AddTxIn(theirInput)
 	}
+
+	if pendingReservation.partialState.TokenId.IsValid() {
+		AddTokenSendTxout(fundingTx, &pendingReservation.partialState.TokenId,
+			int64(pendingReservation.partialState.TokenCapacity))
+	}
+
 	for _, ourChangeOutput := range ourContribution.ChangeOutputs {
 		fundingTx.AddTxOut(ourChangeOutput)
 	}
@@ -725,10 +729,11 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	// Finally, add the 2-of-2 multi-sig output which will set up the lightning
 	// channel.
 	channelCapacity := int64(pendingReservation.partialState.Capacity)
+	channelTokenCapacity := int64(pendingReservation.partialState.TokenCapacity)
 	witnessScript, multiSigOut, err := input.GenFundingPkScript(
 		ourKey.PubKey.SerializeCompressed(),
 		theirKey.PubKey.SerializeCompressed(), channelCapacity,
-		&pendingReservation.partialState.TokenId,
+		&pendingReservation.partialState.TokenId, channelTokenCapacity,
 	)
 	if err != nil {
 		req.err <- err
@@ -813,14 +818,14 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
 	tokenId := &pendingReservation.partialState.TokenId
-	fundingFeeAmt := pendingReservation.partialState.FundingFeeAmt
+	localTokenBalance := pendingReservation.partialState.LocalCommitment.LocalTokenBalance.ToSatoshis()
+	remoteTokenBalance := pendingReservation.partialState.LocalCommitment.RemoteTokenBalance.ToSatoshis()
 	ourCommitTx, theirCommitTx, err := CreateCommitmentTxns(
 		localBalance, remoteBalance, ourContribution.ChannelConfig,
 		theirContribution.ChannelConfig,
 		ourContribution.FirstCommitmentPoint,
 		theirContribution.FirstCommitmentPoint,
-		fundingTxIn, tokenId, fundingFeeAmt,
-		pendingReservation.partialState.IsInitiator,
+		fundingTxIn, tokenId, localTokenBalance, remoteTokenBalance,
 	)
 	if err != nil {
 		req.err <- err
@@ -1036,6 +1041,7 @@ func (l *LightningWallet) handleFundingCounterPartySigs(msg *addCounterPartySigs
 		theirKey.PubKey.SerializeCompressed(),
 		int64(res.partialState.Capacity),
 		&res.partialState.TokenId,
+		int64(res.partialState.TokenCapacity),
 	)
 	if err != nil {
 		msg.err <- err
@@ -1046,9 +1052,11 @@ func (l *LightningWallet) handleFundingCounterPartySigs(msg *addCounterPartySigs
 	// Next, create the spending scriptSig, and then verify that the script
 	// is complete, allowing us to spend from the funding transaction.
 	channelValue := int64(res.partialState.Capacity)
+	channelTokenValue := int64(res.partialState.TokenCapacity)
 	hashCache := txscript.NewTxSigHashes(commitTx)
 	sigHash, err := txscript.CalcWitnessSigHash(witnessScript, hashCache,
-		txscript.SigHashAll, commitTx, 0, channelValue, wire.EmptyTokenId[:], 0)
+		txscript.SigHashAll, commitTx, 0, channelValue,
+		res.partialState.TokenId[:], channelTokenValue)
 	if err != nil {
 		msg.err <- err
 		msg.completeChan <- nil
@@ -1140,14 +1148,15 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
 	tokenId := &pendingReservation.partialState.TokenId
-	fundingFeeAmt := pendingReservation.partialState.FundingFeeAmt
+	localTokenBalance := pendingReservation.partialState.LocalCommitment.LocalTokenBalance.ToSatoshis()
+	remoteTokenBalance := pendingReservation.partialState.LocalCommitment.RemoteTokenBalance.ToSatoshis()
 	ourCommitTx, theirCommitTx, err := CreateCommitmentTxns(
 		localBalance, remoteBalance,
 		pendingReservation.ourContribution.ChannelConfig,
 		pendingReservation.theirContribution.ChannelConfig,
 		pendingReservation.ourContribution.FirstCommitmentPoint,
 		pendingReservation.theirContribution.FirstCommitmentPoint,
-		*fundingTxIn, tokenId, fundingFeeAmt, pendingReservation.partialState.IsInitiator,
+		*fundingTxIn, tokenId, localTokenBalance, remoteTokenBalance,
 	)
 	if err != nil {
 		req.err <- err
@@ -1183,13 +1192,14 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		req.fundingOutpoint, spew.Sdump(theirCommitTx))
 
 	channelValue := int64(pendingReservation.partialState.Capacity)
+	channelTokenValue := int64(pendingReservation.partialState.TokenCapacity)
 	hashCache := txscript.NewTxSigHashes(ourCommitTx)
 	theirKey := pendingReservation.theirContribution.MultiSigKey
 	ourKey := pendingReservation.ourContribution.MultiSigKey
 	witnessScript, _, err := input.GenFundingPkScript(
 		ourKey.PubKey.SerializeCompressed(),
 		theirKey.PubKey.SerializeCompressed(), channelValue,
-		tokenId,
+		tokenId, channelTokenValue,
 	)
 	if err != nil {
 		req.err <- err
@@ -1198,7 +1208,9 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	}
 
 	sigHash, err := txscript.CalcWitnessSigHash(witnessScript, hashCache,
-		txscript.SigHashAll, ourCommitTx, 0, channelValue, wire.EmptyTokenId[:], 0)
+		txscript.SigHashAll, ourCommitTx, 0, channelValue,
+		pendingReservation.partialState.TokenId[:], channelTokenValue)
+
 	if err != nil {
 		req.err <- err
 		req.completeChan <- nil
@@ -1239,6 +1251,10 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		HashType:   txscript.SigHashAll,
 		SigHashes:  txscript.NewTxSigHashes(theirCommitTx),
 		InputIndex: 0,
+	}
+	if pendingReservation.partialState.TokenId.IsValid() {
+		signDesc.Output.TokenId.SetBytes(pendingReservation.partialState.TokenId[:])
+		signDesc.Output.TokenValue = channelTokenValue
 	}
 	sigTheirCommit, err := l.Cfg.Signer.SignOutputRaw(theirCommitTx, &signDesc)
 	if err != nil {

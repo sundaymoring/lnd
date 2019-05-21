@@ -138,6 +138,10 @@ func (tokenId *TokenId) IsEqual(target *TokenId) bool {
 	return *tokenId == *target
 }
 
+func (tokenId *TokenId) IsValid() bool {
+	return *tokenId != EmptyTokenId
+}
+
 // witnessMarkerBytes are a pair of bytes specific to the witness encoding. If
 // this sequence is encoutered, then it indicates a transaction has iwtness
 // data. The first byte is an always 0x00 marker byte, which allows decoders to

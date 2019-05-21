@@ -215,6 +215,7 @@ type PaymentDescriptor struct {
 
 	// Amount is the HTLC amount in milli-satoshis.
 	Amount lnwire.MilliSatoshi
+	TokenAmount lnwire.MilliSatoshi
 
 	// LogIndex is the log entry number that his HTLC update has within the
 	// log. Depending on if IsIncoming is true, this is either an entry the
@@ -379,6 +380,7 @@ func PayDescsFromRemoteLogUpdates(chanID lnwire.ShortChannelID, height uint64,
 				RHash:     wireMsg.PaymentHash,
 				Timeout:   wireMsg.Expiry,
 				Amount:    wireMsg.Amount,
+				TokenAmount: wireMsg.TokenAmount,
 				EntryType: Add,
 				HtlcIndex: wireMsg.ID,
 				LogIndex:  logUpdate.LogIndex,
@@ -703,6 +705,7 @@ func (c *commitment) toDiskCommit(ourCommit bool) *channeldb.ChannelCommitment {
 		h := channeldb.HTLC{
 			RHash:         htlc.RHash,
 			Amt:           htlc.Amount,
+			TokenAmt: 	   htlc.TokenAmount,
 			RefundTimeout: htlc.Timeout,
 			OutputIndex:   outputIndex,
 			HtlcIndex:     htlc.HtlcIndex,
@@ -728,6 +731,7 @@ func (c *commitment) toDiskCommit(ourCommit bool) *channeldb.ChannelCommitment {
 		h := channeldb.HTLC{
 			RHash:         htlc.RHash,
 			Amt:           htlc.Amount,
+			TokenAmt: 	   htlc.TokenAmount,
 			RefundTimeout: htlc.Timeout,
 			OutputIndex:   outputIndex,
 			HtlcIndex:     htlc.HtlcIndex,
@@ -800,6 +804,7 @@ func (lc *LightningChannel) diskHtlcToPayDesc(feeRate SatPerKWeight,
 		RHash:              htlc.RHash,
 		Timeout:            htlc.RefundTimeout,
 		Amount:             htlc.Amt,
+		TokenAmount:        htlc.TokenAmt,
 		EntryType:          Add,
 		HtlcIndex:          htlc.HtlcIndex,
 		LogIndex:           htlc.LogIndex,
@@ -902,10 +907,13 @@ func (lc *LightningChannel) diskCommitToMemCommit(isLocal bool,
 		feePerKw:          SatPerKWeight(diskCommit.FeePerKw),
 		incomingHTLCs:     incomingHtlcs,
 		outgoingHTLCs:     outgoingHtlcs,
-		ourTokenBalance:   diskCommit.LocalTokenBalance,
-		theirTokenBalance: diskCommit.RemoteTokenBalance,
 	}
-	commit.tokenId.SetBytes(lc.channelState.TokenId[:])
+
+	if lc.channelState.TokenId.IsValid() {
+		commit.tokenId.SetBytes(lc.channelState.TokenId[:])
+		commit.ourTokenBalance = diskCommit.LocalTokenBalance
+		commit.theirTokenBalance = diskCommit.RemoteTokenBalance
+	}
 
 	if isLocal {
 		commit.dustLimit = lc.channelState.LocalChanCfg.DustLimit
@@ -1458,7 +1466,7 @@ func (lc *LightningChannel) createSignDesc() error {
 		InputIndex: 0,
 	}
 
-	if lc.channelState.TokenId != wire.EmptyTokenId {
+	if lc.channelState.TokenId.IsValid() {
 		lc.signDesc.Output.TokenId.SetBytes(lc.channelState.TokenId[:])
 		lc.signDesc.Output.TokenValue = int64(lc.channelState.TokenCapacity)
 	}
@@ -1524,6 +1532,7 @@ func (lc *LightningChannel) logUpdateToPayDesc(logUpdate *channeldb.LogUpdate,
 			RHash:                 wireMsg.PaymentHash,
 			Timeout:               wireMsg.Expiry,
 			Amount:                wireMsg.Amount,
+			TokenAmount:           wireMsg.TokenAmount,
 			EntryType:             Add,
 			HtlcIndex:             wireMsg.ID,
 			LogIndex:              logUpdate.LogIndex,
@@ -1555,6 +1564,7 @@ func (lc *LightningChannel) logUpdateToPayDesc(logUpdate *channeldb.LogUpdate,
 
 		pd = &PaymentDescriptor{
 			Amount:                   ogHTLC.Amount,
+			TokenAmount:           	  ogHTLC.TokenAmount,
 			RPreimage:                wireMsg.PaymentPreimage,
 			LogIndex:                 logUpdate.LogIndex,
 			ParentIndex:              ogHTLC.HtlcIndex,
@@ -1571,6 +1581,7 @@ func (lc *LightningChannel) logUpdateToPayDesc(logUpdate *channeldb.LogUpdate,
 
 		pd = &PaymentDescriptor{
 			Amount:                   ogHTLC.Amount,
+			TokenAmount:           	  ogHTLC.TokenAmount,
 			RHash:                    ogHTLC.RHash,
 			ParentIndex:              ogHTLC.HtlcIndex,
 			LogIndex:                 logUpdate.LogIndex,
@@ -1587,6 +1598,7 @@ func (lc *LightningChannel) logUpdateToPayDesc(logUpdate *channeldb.LogUpdate,
 
 		pd = &PaymentDescriptor{
 			Amount:                   ogHTLC.Amount,
+			TokenAmount:           	  ogHTLC.TokenAmount,
 			RHash:                    ogHTLC.RHash,
 			ParentIndex:              ogHTLC.HtlcIndex,
 			LogIndex:                 logUpdate.LogIndex,
@@ -2059,7 +2071,6 @@ func NewBreachRetribution(chanState *channeldb.OpenChannel, stateNum uint64,
 			Output: &wire.TxOut{
 				PkScript: localPkScript,
 				Value:    int64(localAmt),
-				TokenValue: int64(localTokenAmt),
 			},
 			HashType: txscript.SigHashAll,
 		}
@@ -2075,10 +2086,17 @@ func NewBreachRetribution(chanState *channeldb.OpenChannel, stateNum uint64,
 			Output: &wire.TxOut{
 				PkScript: remoteWitnessHash,
 				Value:    int64(remoteAmt),
-				TokenValue: int64(remoteTokenAmt),
 			},
 			HashType: txscript.SigHashAll,
 		}
+	}
+
+	if chanState.TokenId.IsValid() {
+		localSignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
+		localSignDesc.Output.TokenValue = int64(localTokenAmt)
+
+		remoteSignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
+		remoteSignDesc.Output.TokenValue = int64(remoteTokenAmt)
 	}
 
 	// With the commitment outputs located, we'll now generate all the
@@ -2143,7 +2161,7 @@ func NewBreachRetribution(chanState *channeldb.OpenChannel, stateNum uint64,
 			return nil, err
 		}
 
-		htlcRetributions = append(htlcRetributions, HtlcRetribution{
+		htlcRetribution := HtlcRetribution{
 			SignDesc: input.SignDescriptor{
 				KeyDesc:       chanState.LocalChanCfg.RevocationBasePoint,
 				DoubleTweak:   commitmentSecret,
@@ -2160,7 +2178,13 @@ func NewBreachRetribution(chanState *channeldb.OpenChannel, stateNum uint64,
 			},
 			SecondLevelWitnessScript: secondLevelWitnessScript,
 			IsIncoming:               htlc.Incoming,
-		})
+		}
+		if chanState.TokenId.IsValid() {
+			htlcRetribution.SignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
+			htlcRetribution.SignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
+		}
+
+		htlcRetributions = append(htlcRetributions, htlcRetribution)
 	}
 
 	// Finally, with all the necessary data constructed, we can create the
@@ -2299,7 +2323,7 @@ func (lc *LightningChannel) fetchCommitmentView(remoteChain bool,
 	// in order to update their commitment addition height, and to adjust
 	// the balances on the commitment transaction accordingly.
 	htlcView := lc.fetchHTLCView(theirLogIndex, ourLogIndex)
-	ourBalance, theirBalance, _, filteredHTLCView := lc.computeView(
+	ourBalance, theirBalance, _, filteredHTLCView,  ourTokenBalance, theirTokenBalance := lc.computeView(
 		htlcView, remoteChain, true,
 	)
 	feePerKw := filteredHTLCView.feePerKw
@@ -2324,7 +2348,12 @@ func (lc *LightningChannel) fetchCommitmentView(remoteChain bool,
 		feePerKw:          feePerKw,
 		dustLimit:         dustLimit,
 		isOurs:            !remoteChain,
-		ourTokenBalance:
+	}
+
+	if lc.channelState.TokenId.IsValid() {
+		c.tokenId.SetBytes(lc.channelState.TokenId[:])
+		c.ourTokenBalance = ourTokenBalance
+		c.theirTokenBalance = theirTokenBalance
 	}
 
 	// Actually generate unsigned commitment transaction for this view.
@@ -2365,6 +2394,9 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 	ourBalance := c.ourBalance
 	theirBalance := c.theirBalance
 
+	ourTokenBalance := c.ourTokenBalance
+	theirTokenBalance := c.theirTokenBalance
+
 	numHTLCs := int64(0)
 	for _, htlc := range filteredHTLCView.ourUpdates {
 		if htlcIsDust(false, c.isOurs, c.feePerKw,
@@ -2395,50 +2427,51 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 	// ensuring that we account for any dust outputs trimmed above.
 	commitFee := c.feePerKw.FeeForWeight(totalCommitWeight)
 	commitFeeMSat := lnwire.NewMSatFromSatoshis(commitFee)
-	fundingFeeChange := lnwire.NewMSatFromSatoshis(lc.channelState.FundingFeeAmt)
 
 	// Currently, within the protocol, the initiator always pays the fees.
 	// So we'll subtract the fee amount from the balance of the current
 	// initiator. If the initiator is unable to pay the fee fully, then
 	// their entire output is consumed.
-	if lc.channelState.TokenId == wire.EmptyTokenId {
-		switch {
-		case lc.channelState.IsInitiator && commitFee > ourBalance.ToSatoshis():
-			ourBalance = 0
+	switch {
+	case lc.channelState.IsInitiator && commitFee > ourBalance.ToSatoshis():
+		ourBalance = 0
 
-		case lc.channelState.IsInitiator:
-			ourBalance -= commitFeeMSat
+	case lc.channelState.IsInitiator:
+		ourBalance -= commitFeeMSat
 
-		case !lc.channelState.IsInitiator && commitFee > theirBalance.ToSatoshis():
-			theirBalance = 0
+	case !lc.channelState.IsInitiator && commitFee > theirBalance.ToSatoshis():
+		theirBalance = 0
 
-		case !lc.channelState.IsInitiator:
-			theirBalance -= commitFeeMSat
-		}
-	} else {
-		fundingFeeChange -= commitFeeMSat
-		fundingFeeChange -= lnwire.NewMSatFromSatoshis(btcutil.Amount(numHTLCs * wire.DefaultTokenCommitmentTxVoutValue))
+	case !lc.channelState.IsInitiator:
+		theirBalance -= commitFeeMSat
 	}
 
 	var (
 		delay                      uint32
 		delayBalance, p2wkhBalance btcutil.Amount
+		delayTokenBalance, p2wkhTokenBalance btcutil.Amount
 	)
 	if c.isOurs {
 		delay = uint32(lc.localChanCfg.CsvDelay)
 		delayBalance = ourBalance.ToSatoshis()
 		p2wkhBalance = theirBalance.ToSatoshis()
+
+		delayTokenBalance = ourTokenBalance.ToSatoshis()
+		p2wkhTokenBalance = theirTokenBalance.ToSatoshis()
 	} else {
 		delay = uint32(lc.remoteChanCfg.CsvDelay)
 		delayBalance = theirBalance.ToSatoshis()
 		p2wkhBalance = ourBalance.ToSatoshis()
+
+		delayTokenBalance = theirTokenBalance.ToSatoshis()
+		p2wkhTokenBalance = ourTokenBalance.ToSatoshis()
 	}
 
 	// Generate a new commitment transaction with all the latest
 	// unsettled/un-timed out HTLCs.
 	commitTx, err := CreateCommitTx(lc.fundingTxIn(), keyRing, delay,
 		delayBalance, p2wkhBalance, c.dustLimit, &lc.channelState.TokenId,
-		fundingFeeChange.ToSatoshis(), lc.channelState.IsInitiator)
+		delayTokenBalance, p2wkhTokenBalance)
 	if err != nil {
 		return err
 	}
@@ -2453,7 +2486,7 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 			continue
 		}
 
-		err := lc.addHTLC(commitTx, c.isOurs, false, htlc, keyRing, &lc.channelState.TokenId)
+		err := lc.addHTLC(commitTx, c.isOurs, false, htlc, keyRing)
 		if err != nil {
 			return err
 		}
@@ -2464,7 +2497,7 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 			continue
 		}
 
-		err := lc.addHTLC(commitTx, c.isOurs, true, htlc, keyRing, &lc.channelState.TokenId)
+		err := lc.addHTLC(commitTx, c.isOurs, true, htlc, keyRing)
 		if err != nil {
 			return err
 		}
@@ -2492,25 +2525,31 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 
 	// Finally, we'll assert that were not attempting to draw more out of
 	// the channel that was originally placed within it.
-	var totalOut btcutil.Amount
+	var totalOut, totalTokenOut btcutil.Amount
 	for _, txOut := range commitTx.TxOut {
-		if lc.channelState.TokenId == wire.EmptyTokenId {
-			totalOut += btcutil.Amount(txOut.Value)
-		} else {
-			totalOut += btcutil.Amount(txOut.TokenValue)
+		totalOut += btcutil.Amount(txOut.Value)
+		if lc.channelState.TokenId.IsValid() {
+			totalTokenOut += btcutil.Amount(txOut.TokenValue)
 		}
 	}
-	if totalOut > lc.channelState.Capacity {
+	if totalOut > lc.channelState.Capacity || totalTokenOut > lc.channelState.TokenCapacity {
 		return fmt.Errorf("height=%v, for ChannelPoint(%v) attempts "+
-			"to consume %v while channel capacity is %v",
+			"to consume %v (Token: %v)while channel capacity is %v (Token: %v)",
 			c.height, lc.channelState.FundingOutpoint,
-			totalOut, lc.channelState.Capacity)
+			totalOut, totalTokenOut, lc.channelState.Capacity, lc.channelState.TokenCapacity)
 	}
 
 	c.txn = commitTx
 	c.fee = commitFee
 	c.ourBalance = ourBalance
 	c.theirBalance = theirBalance
+
+	if lc.channelState.TokenId.IsValid() {
+		c.tokenId.SetBytes(lc.channelState.TokenId[:])
+		c.ourTokenBalance = ourTokenBalance
+		c.theirTokenBalance = theirTokenBalance
+	}
+
 	return nil
 }
 
@@ -2527,8 +2566,8 @@ func (lc *LightningChannel) createCommitmentTx(c *commitment,
 // TODO(halseth): return htlcs to mutate instead of mutating inside
 // method.
 func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
-	theirBalance *lnwire.MilliSatoshi, nextHeight uint64,
-	remoteChain, mutateState bool) *htlcView {
+	theirBalance, ourTokenBalance, theirTokenBalance *lnwire.MilliSatoshi,
+	nextHeight uint64, remoteChain, mutateState bool) *htlcView {
 
 	// We initialize the view's fee rate to the fee rate of the unfiltered
 	// view. If any fee updates are found when evaluating the view, it will
@@ -2568,6 +2607,7 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 		if mutateState && entry.EntryType == Settle && !remoteChain &&
 			entry.removeCommitHeightLocal == 0 {
 			lc.channelState.TotalMSatReceived += entry.Amount
+			lc.channelState.TokenTotalMSatReceived += entry.TokenAmount
 		}
 
 		addEntry := lc.remoteUpdateLog.lookupHtlc(entry.ParentIndex)
@@ -2588,7 +2628,7 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 		}
 
 		skipThem[addEntry.HtlcIndex] = struct{}{}
-		processRemoveEntry(entry, ourBalance, theirBalance,
+		processRemoveEntry(entry, ourBalance, theirBalance, ourTokenBalance, theirTokenBalance,
 			nextHeight, remoteChain, true, mutateState)
 	}
 	for _, entry := range view.theirUpdates {
@@ -2613,6 +2653,7 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 		if mutateState && entry.EntryType == Settle && !remoteChain &&
 			entry.removeCommitHeightLocal == 0 {
 			lc.channelState.TotalMSatSent += entry.Amount
+			lc.channelState.TokenTotalMSatSent += entry.TokenAmount
 		}
 
 		addEntry := lc.localUpdateLog.lookupHtlc(entry.ParentIndex)
@@ -2633,7 +2674,7 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 		}
 
 		skipUs[addEntry.HtlcIndex] = struct{}{}
-		processRemoveEntry(entry, ourBalance, theirBalance,
+		processRemoveEntry(entry, ourBalance, theirBalance, ourTokenBalance, theirTokenBalance,
 			nextHeight, remoteChain, false, mutateState)
 	}
 
@@ -2646,8 +2687,8 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 			continue
 		}
 
-		processAddEntry(entry, ourBalance, theirBalance, nextHeight,
-			remoteChain, false, mutateState)
+		processAddEntry(entry, ourBalance, theirBalance, ourTokenBalance, theirTokenBalance,
+			nextHeight,	remoteChain, false, mutateState)
 		newView.ourUpdates = append(newView.ourUpdates, entry)
 	}
 	for _, entry := range view.theirUpdates {
@@ -2656,8 +2697,8 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 			continue
 		}
 
-		processAddEntry(entry, ourBalance, theirBalance, nextHeight,
-			remoteChain, true, mutateState)
+		processAddEntry(entry, ourBalance, theirBalance, ourTokenBalance, theirTokenBalance,
+			nextHeight,	remoteChain, true, mutateState)
 		newView.theirUpdates = append(newView.theirUpdates, entry)
 	}
 
@@ -2668,7 +2709,8 @@ func (lc *LightningChannel) evaluateHTLCView(view *htlcView, ourBalance,
 // If the HTLC hasn't yet been committed in either chain, then the height it
 // was committed is updated. Keeping track of this inclusion height allows us to
 // later compact the log once the change is fully committed in both chains.
-func processAddEntry(htlc *PaymentDescriptor, ourBalance, theirBalance *lnwire.MilliSatoshi,
+func processAddEntry(htlc *PaymentDescriptor, ourBalance, theirBalance, ourTokenBalance,
+	theirTokenBalance *lnwire.MilliSatoshi,
 	nextHeight uint64, remoteChain bool, isIncoming, mutateState bool) {
 
 	// If we're evaluating this entry for the remote chain (to create/view
@@ -2691,10 +2733,12 @@ func processAddEntry(htlc *PaymentDescriptor, ourBalance, theirBalance *lnwire.M
 		// to update their balance accordingly by subtracting the
 		// amount of the HTLC that are funds pending.
 		*theirBalance -= htlc.Amount
+		*theirTokenBalance -= htlc.TokenAmount
 	} else {
 		// Similarly, we need to debit our balance if this is an out
 		// going HTLC to reflect the pending balance.
 		*ourBalance -= htlc.Amount
+		*ourTokenBalance -= htlc.TokenAmount
 	}
 
 	if mutateState {
@@ -2706,8 +2750,8 @@ func processAddEntry(htlc *PaymentDescriptor, ourBalance, theirBalance *lnwire.M
 // previously added HTLC. If the removal entry has already been processed, it
 // is skipped.
 func processRemoveEntry(htlc *PaymentDescriptor, ourBalance,
-	theirBalance *lnwire.MilliSatoshi, nextHeight uint64,
-	remoteChain bool, isIncoming, mutateState bool) {
+	theirBalance, ourTokenBalance, theirTokenBalance *lnwire.MilliSatoshi,
+	nextHeight uint64, remoteChain bool, isIncoming, mutateState bool) {
 
 	var removeHeight *uint64
 	if remoteChain {
@@ -2728,11 +2772,12 @@ func processRemoveEntry(htlc *PaymentDescriptor, ourBalance,
 	// the HTLC amount.
 	case isIncoming && htlc.EntryType == Settle:
 		*ourBalance += htlc.Amount
-
+		*ourTokenBalance += htlc.TokenAmount
 	// Otherwise, this HTLC is being failed out, therefore the value of the
 	// HTLC should return to the remote party.
 	case isIncoming && (htlc.EntryType == Fail || htlc.EntryType == MalformedFail):
 		*theirBalance += htlc.Amount
+		*theirTokenBalance += htlc.TokenAmount
 
 	// If an outgoing HTLC is being settled, then this means that the
 	// downstream party resented the preimage or learned of it via a
@@ -2740,11 +2785,13 @@ func processRemoveEntry(htlc *PaymentDescriptor, ourBalance,
 	// the value of the HTLC.
 	case !isIncoming && htlc.EntryType == Settle:
 		*theirBalance += htlc.Amount
+		*theirTokenBalance += htlc.TokenAmount
 
 	// Otherwise, one of our outgoing HTLC's has timed out, so the value of
 	// the HTLC should be returned to our settled balance.
 	case !isIncoming && (htlc.EntryType == Fail || htlc.EntryType == MalformedFail):
 		*ourBalance += htlc.Amount
+		*ourTokenBalance += htlc.TokenAmount
 	}
 
 	if mutateState {
@@ -2841,6 +2888,7 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			op, outputAmt, htlc.Timeout,
 			uint32(remoteChanCfg.CsvDelay),
 			keyRing.RevocationKey, keyRing.DelayKey,
+			&remoteCommitView.tokenId, htlc.TokenAmount.ToSatoshis(),
 		)
 		if err != nil {
 			return nil, nil, err
@@ -2861,6 +2909,10 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			InputIndex: 0,
 		}
 		sigJob.OutputIndex = htlc.remoteOutputIndex
+		if remoteCommitView.tokenId.IsValid() {
+			sigJob.SignDesc.Output.TokenId.SetBytes(remoteCommitView.tokenId[:])
+			sigJob.SignDesc.Output.TokenValue = int64(htlc.TokenAmount.ToSatoshis())
+		}
 
 		sigBatch = append(sigBatch, sigJob)
 	}
@@ -2892,6 +2944,7 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 		sigJob.Tx, err = createHtlcSuccessTx(
 			op, outputAmt, uint32(remoteChanCfg.CsvDelay),
 			keyRing.RevocationKey, keyRing.DelayKey,
+			&remoteCommitView.tokenId, htlc.TokenAmount.ToSatoshis(),
 		)
 		if err != nil {
 			return nil, nil, err
@@ -2912,7 +2965,10 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			InputIndex: 0,
 		}
 		sigJob.OutputIndex = htlc.remoteOutputIndex
-
+		if remoteCommitView.tokenId.IsValid() {
+			sigJob.SignDesc.Output.TokenId.SetBytes(remoteCommitView.tokenId[:])
+			sigJob.SignDesc.Output.TokenValue = int64(htlc.TokenAmount.ToSatoshis())
+		}
 		sigBatch = append(sigBatch, sigJob)
 	}
 
@@ -2975,6 +3031,7 @@ func (lc *LightningChannel) createCommitDiff(
 				ChanID:      chanID,
 				ID:          pd.HtlcIndex,
 				Amount:      pd.Amount,
+				TokenAmount: pd.TokenAmount,
 				Expiry:      pd.Timeout,
 				PaymentHash: pd.RHash,
 			}
@@ -3136,10 +3193,10 @@ func (lc *LightningChannel) SignNextCommitment() (lnwire.Sig, []lnwire.Sig, erro
 		lc.channelState.FundingOutpoint, newCommitView.height,
 		lc.localUpdateLog.logIndex, remoteACKedIndex)
 
-	walletLog.Tracef("ChannelPoint(%v): remote chain: our_balance=%v, "+
-		"their_balance=%v, commit_tx: %v",
-		lc.channelState.FundingOutpoint, newCommitView.ourBalance,
-		newCommitView.theirBalance,
+	walletLog.Tracef("ChannelPoint(%v): remote chain: our_balance=%v (out_token_balance=%v), "+
+		"their_balance=%v (their_token_balance=%v), commit_tx: %v",
+		lc.channelState.FundingOutpoint, newCommitView.ourBalance, newCommitView.ourTokenBalance,
+		newCommitView.theirBalance, newCommitView.theirTokenBalance,
 		newLogClosure(func() string {
 			return spew.Sdump(newCommitView.txn)
 		}),
@@ -3658,7 +3715,7 @@ func (lc *LightningChannel) computeView(view *htlcView, remoteChain bool,
 	// updates are found in the logs, the comitment fee rate should be
 	// changed, so we'll also set the feePerKw to this new value.
 	filteredHTLCView := lc.evaluateHTLCView(view, &ourBalance,
-		&theirBalance, nextHeight, remoteChain, updateState)
+		&theirBalance, &ourTokenBalance, &theirTokenBalance, nextHeight, remoteChain, updateState)
 	feePerKw := filteredHTLCView.feePerKw
 
 	// Now go through all HTLCs at this stage, to calculate the total
@@ -3713,7 +3770,7 @@ func (lc *LightningChannel) validateCommitmentSanity(theirLogCounter,
 	ourInitialBalance := commitChain.tip().ourBalance
 	theirInitialBalance := commitChain.tip().theirBalance
 
-	ourBalance, theirBalance, commitWeight, filteredView := lc.computeView(
+	ourBalance, theirBalance, commitWeight, filteredView, ourTokenBalance, theirTokenBalance := lc.computeView(
 		view, remoteChain, false,
 	)
 	feePerKw := filteredView.feePerKw
@@ -3733,9 +3790,9 @@ func (lc *LightningChannel) validateCommitmentSanity(theirLogCounter,
 	// they have, then this indicates that a party doesn't have sufficient
 	// balance to satisfy the final evaluated HTLC's.
 	switch {
-	case int64(ourBalance) < 0:
+	case int64(ourBalance) < 0 || int64(ourTokenBalance) < 0:
 		return ErrBelowChanReserve
-	case int64(theirBalance) < 0:
+	case int64(theirBalance) < 0 || int64(theirTokenBalance) < 0:
 		return ErrBelowChanReserve
 	}
 
@@ -3841,7 +3898,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 	// HLTC output. Given the sighash, and the signing key, we'll be able
 	// to validate each signature within the worker pool.
 	i := 0
-	for index, vout := range localCommitmentView.txn.TxOut {
+	for index, _ := range localCommitmentView.txn.TxOut {
 		var (
 			htlcIndex uint64
 			sigHash   func() ([]byte, error)
@@ -3869,15 +3926,12 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 				htlcFee := htlcSuccessFee(feePerKw)
 
 				outputAmt := htlc.Amount.ToSatoshis() - htlcFee
-				outputTokenAmt := btcutil.Amount() 0
-				if vout.TokenId != wire.EmptyTokenId {
-					outputAmt = wire.DefaultTokenCommitmentTxVoutValue - htlcFee
-					outputTokenAmt = htlc.Amount.ToSatoshis()
-				}
+				outputTokenAmt := htlc.TokenAmount.ToSatoshis()
+
 				successTx, err := createHtlcSuccessTx(op,
 					outputAmt, uint32(localChanCfg.CsvDelay),
 					keyRing.RevocationKey, keyRing.DelayKey,
-					&vout.TokenId, btcutil.Amount(vout.TokenValue))
+					&localCommitmentView.tokenId, btcutil.Amount(outputTokenAmt))
 				if err != nil {
 					return nil, err
 				}
@@ -3886,7 +3940,8 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 				sigHash, err := txscript.CalcWitnessSigHash(
 					htlc.ourWitnessScript, hashCache,
 					txscript.SigHashAll, successTx, 0,
-					int64(htlc.Amount.ToSatoshis()), vout.TokenId[:], vout.TokenValue,
+					int64(htlc.Amount.ToSatoshis()),
+					localCommitmentView.tokenId[:], int64(htlc.TokenAmount.ToSatoshis()),
 				)
 				if err != nil {
 					return nil, err
@@ -3926,12 +3981,13 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 
 				htlcFee := htlcTimeoutFee(feePerKw)
 				outputAmt := htlc.Amount.ToSatoshis() - htlcFee
+				outputTokenAmt := htlc.TokenAmount.ToSatoshis()
 
 				timeoutTx, err := createHtlcTimeoutTx(op,
 					outputAmt, htlc.Timeout,
 					uint32(localChanCfg.CsvDelay),
 					keyRing.RevocationKey, keyRing.DelayKey,
-					&vout.TokenId, btcutil.Amount(vout.TokenValue),
+					&localCommitmentView.tokenId, btcutil.Amount(outputTokenAmt),
 				)
 				if err != nil {
 					return nil, err
@@ -3942,7 +3998,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 					htlc.ourWitnessScript, hashCache,
 					txscript.SigHashAll, timeoutTx, 0,
 					int64(htlc.Amount.ToSatoshis()),
-					vout.TokenId[:], vout.TokenValue,
+					localCommitmentView.tokenId[:], int64(htlc.TokenAmount.ToSatoshis()),
 				)
 				if err != nil {
 					return nil, err
@@ -4106,9 +4162,10 @@ func (lc *LightningChannel) ReceiveNewCommitment(commitSig lnwire.Sig,
 		lc.channelState.FundingOutpoint, localCommitmentView.height,
 		localACKedIndex, lc.remoteUpdateLog.logIndex)
 
-	walletLog.Tracef("ChannelPoint(%v): local chain: our_balance=%v, "+
-		"their_balance=%v, commit_tx: %v", lc.channelState.FundingOutpoint,
-		localCommitmentView.ourBalance, localCommitmentView.theirBalance,
+	walletLog.Tracef("ChannelPoint(%v): local chain: our_balance=%v (our_token_balance=%v), "+
+		"their_balance=%v (their_token_balance=%v), commit_tx: %v", lc.channelState.FundingOutpoint,
+		localCommitmentView.ourBalance, localCommitmentView.ourTokenBalance,
+		localCommitmentView.theirBalance, localCommitmentView.theirTokenBalance,
 		newLogClosure(func() string {
 			return spew.Sdump(localCommitmentView.txn)
 		}),
@@ -4121,7 +4178,8 @@ func (lc *LightningChannel) ReceiveNewCommitment(commitSig lnwire.Sig,
 	hashCache := txscript.NewTxSigHashes(localCommitTx)
 	sigHash, err := txscript.CalcWitnessSigHash(
 		multiSigScript, hashCache, txscript.SigHashAll,
-		localCommitTx, 0, int64(lc.channelState.Capacity), wire.EmptyTokenId[:], 0,
+		localCommitTx, 0, int64(lc.channelState.Capacity),
+		localCommitmentView.tokenId[:], int64(lc.channelState.TokenCapacity),
 	)
 	if err != nil {
 		// TODO(roasbeef): fetchview has already mutated the HTLCs...
@@ -4267,9 +4325,9 @@ func (lc *LightningChannel) RevokeCurrentCommitment() (*lnwire.RevokeAndAck, []c
 	}
 
 	walletLog.Tracef("ChannelPoint(%v): state transition accepted: "+
-		"our_balance=%v, their_balance=%v",
-		lc.channelState.FundingOutpoint, chainTail.ourBalance,
-		chainTail.theirBalance)
+		"our_balance=%v (our_token_balance=%v), their_balance=%v (their_token_balance=%v)",
+		lc.channelState.FundingOutpoint, chainTail.ourBalance, chainTail.ourTokenBalance,
+		chainTail.theirBalance, chainTail.theirTokenBalance)
 
 	revocationMsg.ChanID = lnwire.NewChanIDFromOutPoint(
 		&lc.channelState.FundingOutpoint,
@@ -4437,6 +4495,7 @@ func (lc *LightningChannel) ReceiveRevocation(revMsg *lnwire.RevokeAndAck) (
 				ChanID:      chanID,
 				ID:          pd.HtlcIndex,
 				Amount:      pd.Amount,
+				TokenAmount: pd.TokenAmount,
 				Expiry:      pd.Timeout,
 				PaymentHash: pd.RHash,
 			}
@@ -4584,6 +4643,7 @@ func (lc *LightningChannel) AddHTLC(htlc *lnwire.UpdateAddHTLC,
 		RHash:          PaymentHash(htlc.PaymentHash),
 		Timeout:        htlc.Expiry,
 		Amount:         htlc.Amount,
+		TokenAmount:    htlc.TokenAmount,
 		LogIndex:       lc.localUpdateLog.logIndex,
 		HtlcIndex:      lc.localUpdateLog.htlcCounter,
 		OnionBlob:      htlc.OnionBlob[:],
@@ -4622,6 +4682,7 @@ func (lc *LightningChannel) ReceiveHTLC(htlc *lnwire.UpdateAddHTLC) (uint64, err
 		RHash:     PaymentHash(htlc.PaymentHash),
 		Timeout:   htlc.Expiry,
 		Amount:    htlc.Amount,
+		TokenAmount:    htlc.TokenAmount,
 		LogIndex:  lc.remoteUpdateLog.logIndex,
 		HtlcIndex: lc.remoteUpdateLog.htlcCounter,
 		OnionBlob: htlc.OnionBlob[:],
@@ -4680,6 +4741,7 @@ func (lc *LightningChannel) SettleHTLC(preimage [32]byte,
 
 	pd := &PaymentDescriptor{
 		Amount:           htlc.Amount,
+		TokenAmount:      htlc.TokenAmount,
 		RPreimage:        preimage,
 		LogIndex:         lc.localUpdateLog.logIndex,
 		ParentIndex:      htlcIndex,
@@ -4725,6 +4787,7 @@ func (lc *LightningChannel) ReceiveHTLCSettle(preimage [32]byte, htlcIndex uint6
 
 	pd := &PaymentDescriptor{
 		Amount:      htlc.Amount,
+		TokenAmount: htlc.TokenAmount,
 		RPreimage:   preimage,
 		ParentIndex: htlc.HtlcIndex,
 		RHash:       htlc.RHash,
@@ -4785,6 +4848,7 @@ func (lc *LightningChannel) FailHTLC(htlcIndex uint64, reason []byte,
 
 	pd := &PaymentDescriptor{
 		Amount:           htlc.Amount,
+		TokenAmount:      htlc.TokenAmount,
 		RHash:            htlc.RHash,
 		ParentIndex:      htlcIndex,
 		LogIndex:         lc.localUpdateLog.logIndex,
@@ -4835,6 +4899,7 @@ func (lc *LightningChannel) MalformedFailHTLC(htlcIndex uint64,
 
 	pd := &PaymentDescriptor{
 		Amount:       htlc.Amount,
+		TokenAmount:  htlc.TokenAmount,
 		RHash:        htlc.RHash,
 		ParentIndex:  htlcIndex,
 		LogIndex:     lc.localUpdateLog.logIndex,
@@ -4878,6 +4943,7 @@ func (lc *LightningChannel) ReceiveFailHTLC(htlcIndex uint64, reason []byte,
 
 	pd := &PaymentDescriptor{
 		Amount:      htlc.Amount,
+		TokenAmount: htlc.TokenAmount,
 		RHash:       htlc.RHash,
 		ParentIndex: htlc.HtlcIndex,
 		LogIndex:    lc.remoteUpdateLog.logIndex,
@@ -4976,7 +5042,7 @@ func genHtlcScript(isIncoming, ourCommit bool, timeout uint32, rHash [32]byte,
 // the descriptor itself.
 func (lc *LightningChannel) addHTLC(commitTx *wire.MsgTx, ourCommit bool,
 	isIncoming bool, paymentDesc *PaymentDescriptor,
-	keyRing *CommitmentKeyRing, tokenId *wire.TokenId) error {
+	keyRing *CommitmentKeyRing) error {
 
 	timeout := paymentDesc.Timeout
 	rHash := paymentDesc.RHash
@@ -4989,13 +5055,12 @@ func (lc *LightningChannel) addHTLC(commitTx *wire.MsgTx, ourCommit bool,
 
 	// Add the new HTLC outputs to the respective commitment transactions.
 	amountPending := int64(paymentDesc.Amount.ToSatoshis())
-	commitTx.AddTxOut(wire.NewTxOut(amountPending, p2wsh))
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
-		newOutIndex := len(commitTx.TxOut) - 1
-		commitTx.TxOut[newOutIndex].TokenId.SetBytes(tokenId[:])
-		commitTx.TxOut[newOutIndex].TokenValue = commitTx.TxOut[newOutIndex].Value
-		commitTx.TxOut[newOutIndex].Value = wire.DefaultTokenCommitmentTxVoutValue
+	out := wire.NewTxOut(amountPending, p2wsh)
+	if lc.channelState.TokenId.IsValid() {
+		out.TokenId.SetBytes(lc.channelState.TokenId[:])
+		out.TokenValue = int64(paymentDesc.TokenAmount.ToSatoshis())
 	}
+	commitTx.AddTxOut(out)
 
 	// Store the pkScript of this particular PaymentDescriptor so we can
 	// quickly locate it within the commitment transaction later.
@@ -5125,7 +5190,7 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 	htlcResolutions, err := extractHtlcResolutions(
 		SatPerKWeight(remoteCommit.FeePerKw), false, signer, remoteCommit.Htlcs,
 		keyRing, &chanState.LocalChanCfg, &chanState.RemoteChanCfg,
-		*commitSpend.SpenderTxHash, pCache,
+		*commitSpend.SpenderTxHash, pCache, &chanState.TokenId,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create htlc resolutions: %v", err)
@@ -5143,7 +5208,7 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 
 	var (
 		selfPoint    *wire.OutPoint
-		localBalance int64
+		localBalance, localTokenBalance int64
 	)
 
 	for outputIndex, txOut := range commitTxBroadcast.TxOut {
@@ -5153,6 +5218,7 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 				Index: uint32(outputIndex),
 			}
 			localBalance = txOut.Value
+			localTokenBalance = txOut.TokenValue
 			break
 		}
 	}
@@ -5177,6 +5243,11 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 			},
 			MaturityDelay: 0,
 		}
+
+		if chanState.TokenId.IsValid() {
+			commitResolution.SelfOutputSignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
+			commitResolution.SelfOutputSignDesc.Output.TokenValue = localTokenBalance
+		}
 	}
 
 	closeSummary := channeldb.ChannelCloseSummary{
@@ -5187,6 +5258,8 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 		RemotePub:               chanState.IdentityPub,
 		Capacity:                chanState.Capacity,
 		SettledBalance:          btcutil.Amount(localBalance),
+		TokenCapacity:           chanState.TokenCapacity,
+		TokenSettledBalance:     btcutil.Amount(localTokenBalance),
 		CloseType:               channeldb.RemoteForceClose,
 		IsPending:               true,
 		RemoteCurrentRevocation: chanState.RemoteCurrentRevocation,
@@ -5314,7 +5387,7 @@ type HtlcResolutions struct {
 // the remote party's commitment transaction.
 func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.ChannelConfig,
 	commitHash chainhash.Hash, htlc *channeldb.HTLC, keyRing *CommitmentKeyRing,
-	feePerKw SatPerKWeight, dustLimit btcutil.Amount, csvDelay uint32, localCommit bool,
+	feePerKw SatPerKWeight, dustLimit btcutil.Amount, csvDelay uint32, localCommit bool, tokenId *wire.TokenId,
 ) (*OutgoingHtlcResolution, error) {
 
 	op := wire.OutPoint{
@@ -5342,7 +5415,7 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 
 		// With the script generated, we can completely populated the
 		// SignDescriptor needed to sweep the output.
-		return &OutgoingHtlcResolution{
+		htlcResolution := &OutgoingHtlcResolution{
 			Expiry:        htlc.RefundTimeout,
 			ClaimOutpoint: op,
 			SweepSignDesc: input.SignDescriptor{
@@ -5355,7 +5428,12 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 				},
 				HashType: txscript.SigHashAll,
 			},
-		}, nil
+		}
+		if tokenId != nil && tokenId.IsValid() {
+			htlcResolution.SweepSignDesc.Output.TokenId.SetBytes(tokenId[:])
+			htlcResolution.SweepSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
+		}
+		return htlcResolution, nil
 	}
 
 	// Otherwise, we'll need to craft a second level HTLC transaction, as
@@ -5371,7 +5449,7 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 	// transaction.
 	timeoutTx, err := createHtlcTimeoutTx(
 		op, secondLevelOutputAmt, htlc.RefundTimeout, csvDelay,
-		keyRing.RevocationKey, keyRing.DelayKey,
+		keyRing.RevocationKey, keyRing.DelayKey, tokenId, htlc.TokenAmt.ToSatoshis(),
 	)
 	if err != nil {
 		return nil, err
@@ -5395,6 +5473,11 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 		HashType:   txscript.SigHashAll,
 		SigHashes:  txscript.NewTxSigHashes(timeoutTx),
 		InputIndex: 0,
+	}
+
+	if tokenId != nil && tokenId.IsValid() {
+		timeoutSignDesc.Output.TokenId.SetBytes(tokenId[:])
+		timeoutSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
 	}
 
 	// With the sign desc created, we can now construct the full witness
@@ -5424,7 +5507,7 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 	localDelayTweak := input.SingleTweakBytes(
 		keyRing.CommitPoint, localChanCfg.DelayBasePoint.PubKey,
 	)
-	return &OutgoingHtlcResolution{
+	htlcResolution := &OutgoingHtlcResolution{
 		Expiry:          htlc.RefundTimeout,
 		SignedTimeoutTx: timeoutTx,
 		CsvDelay:        csvDelay,
@@ -5442,7 +5525,13 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 			},
 			HashType: txscript.SigHashAll,
 		},
-	}, nil
+	}
+
+	if tokenId != nil && tokenId.IsValid() {
+		htlcResolution.SweepSignDesc.Output.TokenId.SetBytes(tokenId[:])
+		htlcResolution.SweepSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
+	}
+	return htlcResolution, nil
 }
 
 // newIncomingHtlcResolution creates a new HTLC resolution capable of allowing
@@ -5455,7 +5544,7 @@ func newOutgoingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.ChannelConfig,
 	commitHash chainhash.Hash, htlc *channeldb.HTLC, keyRing *CommitmentKeyRing,
 	feePerKw SatPerKWeight, dustLimit btcutil.Amount, csvDelay uint32,
-	localCommit bool, preimage [32]byte) (*IncomingHtlcResolution, error) {
+	localCommit bool, preimage [32]byte, tokenId *wire.TokenId) (*IncomingHtlcResolution, error) {
 
 	op := wire.OutPoint{
 		Hash:  commitHash,
@@ -5481,7 +5570,7 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 
 		// With the script generated, we can completely populated the
 		// SignDescriptor needed to sweep the output.
-		return &IncomingHtlcResolution{
+		htlcResolution := &IncomingHtlcResolution{
 			Preimage:      preimage,
 			ClaimOutpoint: op,
 			CsvDelay:      csvDelay,
@@ -5495,7 +5584,13 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 				},
 				HashType: txscript.SigHashAll,
 			},
-		}, nil
+		}
+
+		if tokenId != nil && tokenId.IsValid() {
+			htlcResolution.SweepSignDesc.Output.TokenId.SetBytes(tokenId[:])
+			htlcResolution.SweepSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
+		}
+		return htlcResolution, nil
 	}
 
 	// Otherwise, we'll need to go to the second level to sweep this HTLC.
@@ -5506,7 +5601,7 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 	secondLevelOutputAmt := htlc.Amt.ToSatoshis() - htlcFee
 	successTx, err := createHtlcSuccessTx(
 		op, secondLevelOutputAmt, csvDelay,
-		keyRing.RevocationKey, keyRing.DelayKey,
+		keyRing.RevocationKey, keyRing.DelayKey, tokenId, htlc.TokenAmt.ToSatoshis(),
 	)
 	if err != nil {
 		return nil, err
@@ -5531,6 +5626,11 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 		HashType:   txscript.SigHashAll,
 		SigHashes:  txscript.NewTxSigHashes(successTx),
 		InputIndex: 0,
+	}
+
+	if tokenId != nil && tokenId.IsValid() {
+		successSignDesc.Output.TokenId.SetBytes(tokenId[:])
+		successSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
 	}
 
 	// Next, we'll construct the full witness needed to satisfy the input
@@ -5560,7 +5660,8 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 	localDelayTweak := input.SingleTweakBytes(
 		keyRing.CommitPoint, localChanCfg.DelayBasePoint.PubKey,
 	)
-	return &IncomingHtlcResolution{
+
+	htlcResolution := &IncomingHtlcResolution{
 		Preimage:        preimage,
 		SignedSuccessTx: successTx,
 		CsvDelay:        csvDelay,
@@ -5578,7 +5679,13 @@ func newIncomingHtlcResolution(signer input.Signer, localChanCfg *channeldb.Chan
 			},
 			HashType: txscript.SigHashAll,
 		},
-	}, nil
+	}
+
+	if tokenId != nil && tokenId.IsValid() {
+		htlcResolution.SweepSignDesc.Output.TokenId.SetBytes(tokenId[:])
+		htlcResolution.SweepSignDesc.Output.TokenValue = int64(htlc.TokenAmt.ToSatoshis())
+	}
+	return htlcResolution, nil
 }
 
 // HtlcPoint returns the htlc's outpoint on the commitment tx.
@@ -5611,7 +5718,7 @@ func (r *OutgoingHtlcResolution) HtlcPoint() wire.OutPoint {
 func extractHtlcResolutions(feePerKw SatPerKWeight, ourCommit bool,
 	signer input.Signer, htlcs []channeldb.HTLC, keyRing *CommitmentKeyRing,
 	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
-	commitHash chainhash.Hash, pCache PreimageCache) (*HtlcResolutions, error) {
+	commitHash chainhash.Hash, pCache PreimageCache, tokenId *wire.TokenId) (*HtlcResolutions, error) {
 
 	// TODO(roasbeef): don't need to swap csv delay?
 	dustLimit := remoteChanCfg.DustLimit
@@ -5647,7 +5754,7 @@ func extractHtlcResolutions(feePerKw SatPerKWeight, ourCommit bool,
 			ihr, err := newIncomingHtlcResolution(
 				signer, localChanCfg, commitHash, &htlc, keyRing,
 				feePerKw, dustLimit, uint32(csvDelay), ourCommit,
-				pre,
+				pre, tokenId,
 			)
 			if err != nil {
 				return nil, err
@@ -5659,7 +5766,7 @@ func extractHtlcResolutions(feePerKw SatPerKWeight, ourCommit bool,
 
 		ohr, err := newOutgoingHtlcResolution(
 			signer, localChanCfg, commitHash, &htlc, keyRing,
-			feePerKw, dustLimit, uint32(csvDelay), ourCommit,
+			feePerKw, dustLimit, uint32(csvDelay), ourCommit, tokenId,
 		)
 		if err != nil {
 			return nil, err
@@ -5828,12 +5935,10 @@ func NewLocalForceCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 			},
 			MaturityDelay: csvTimeout,
 		}
-	}
-
-	if chanState.TokenId != wire.EmptyTokenId {
-		commitResolution.SelfOutputSignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
-		commitResolution.SelfOutputSignDesc.Output.TokenValue = commitResolution.SelfOutputSignDesc.Output.Value
-		commitResolution.SelfOutputSignDesc.Output.Value = wire.DefaultTokenCommitmentTxVoutValue
+		if chanState.TokenId.IsValid() {
+			commitResolution.SelfOutputSignDesc.Output.TokenId.SetBytes(chanState.TokenId[:])
+			commitResolution.SelfOutputSignDesc.Output.TokenValue = int64(localCommit.LocalTokenBalance.ToSatoshis())
+		}
 	}
 
 	// Once the delay output has been found (if it exists), then we'll also
@@ -5843,7 +5948,7 @@ func NewLocalForceCloseSummary(chanState *channeldb.OpenChannel, signer input.Si
 	htlcResolutions, err := extractHtlcResolutions(
 		SatPerKWeight(localCommit.FeePerKw), true, signer,
 		localCommit.Htlcs, keyRing, &chanState.LocalChanCfg,
-		&chanState.RemoteChanCfg, txHash, pCache)
+		&chanState.RemoteChanCfg, txHash, pCache, &chanState.TokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -5886,25 +5991,22 @@ func (lc *LightningChannel) CreateCloseProposal(proposedFee btcutil.Amount,
 	localCommit := lc.channelState.LocalCommitment
 	ourBalance := localCommit.LocalBalance.ToSatoshis()
 	theirBalance := localCommit.RemoteBalance.ToSatoshis()
-	fundingFeeChange := lc.channelState.FundingFeeAmt
+	ourTokenBalance := localCommit.LocalTokenBalance.ToSatoshis()
+	theirTokenBalance := localCommit.RemoteTokenBalance.ToSatoshis()
 
 	// We'll make sure we account for the complete balance by adding the
 	// current dangling commitment fee to the balance of the initiator.
 	commitFee := localCommit.CommitFee
-	if lc.channelState.TokenId == wire.EmptyTokenId {
-		if lc.channelState.IsInitiator {
-			ourBalance = ourBalance - proposedFee + commitFee
-		} else {
-			theirBalance = theirBalance - proposedFee + commitFee
-		}
+	if lc.channelState.IsInitiator {
+		ourBalance = ourBalance - proposedFee + commitFee
 	} else {
-		fundingFeeChange = fundingFeeChange - proposedFee + commitFee
+		theirBalance = theirBalance - proposedFee + commitFee
 	}
 
 	closeTx := CreateCooperativeCloseTx(lc.fundingTxIn(),
 		lc.localChanCfg.DustLimit, lc.remoteChanCfg.DustLimit,
 		ourBalance, theirBalance, localDeliveryScript,
-		remoteDeliveryScript, lc.channelState.IsInitiator, &lc.channelState.TokenId, fundingFeeChange)
+		remoteDeliveryScript, &lc.channelState.TokenId, ourTokenBalance, theirTokenBalance)
 
 	// Ensure that the transaction doesn't explicitly violate any
 	// consensus rules such as being too big, or having any value with a
@@ -5958,19 +6060,16 @@ func (lc *LightningChannel) CompleteCooperativeClose(localSig, remoteSig []byte,
 	localCommit := lc.channelState.LocalCommitment
 	ourBalance := localCommit.LocalBalance.ToSatoshis()
 	theirBalance := localCommit.RemoteBalance.ToSatoshis()
-	fundingFeeChange := lc.channelState.FundingFeeAmt
+	ourTokenBalance := localCommit.LocalTokenBalance.ToSatoshis()
+	theirTokenBalance := localCommit.RemoteTokenBalance.ToSatoshis()
 
 	// We'll make sure we account for the complete balance by adding the
 	// current dangling commitment fee to the balance of the initiator.
 	commitFee := localCommit.CommitFee
-	if lc.channelState.TokenId == wire.EmptyTokenId {
-		if lc.channelState.IsInitiator {
-			ourBalance = ourBalance - proposedFee + commitFee
-		} else {
-			theirBalance = theirBalance - proposedFee + commitFee
-		}
+	if lc.channelState.IsInitiator {
+		ourBalance = ourBalance - proposedFee + commitFee
 	} else {
-		fundingFeeChange = fundingFeeChange - proposedFee + commitFee
+		theirBalance = theirBalance - proposedFee + commitFee
 	}
 
 	// Create the transaction used to return the current settled balance
@@ -5978,8 +6077,8 @@ func (lc *LightningChannel) CompleteCooperativeClose(localSig, remoteSig []byte,
 	// the initiator pays full fees for the cooperative close transaction.
 	closeTx := CreateCooperativeCloseTx(lc.fundingTxIn(),
 		lc.localChanCfg.DustLimit, lc.remoteChanCfg.DustLimit,
-		ourBalance, theirBalance, localDeliveryScript,
-		remoteDeliveryScript, lc.channelState.IsInitiator, &lc.channelState.TokenId, fundingFeeChange)
+		ourBalance, theirBalance, localDeliveryScript, remoteDeliveryScript,
+		&lc.channelState.TokenId, ourTokenBalance, theirTokenBalance)
 
 	// Ensure that the transaction doesn't explicitly validate any
 	// consensus rules such as being too big, or having any value with a
@@ -6043,7 +6142,7 @@ func (lc *LightningChannel) availableBalance() (lnwire.MilliSatoshi, int64) {
 		lc.localUpdateLog.logIndex)
 
 	// Then compute our current balance for that view.
-	ourBalance, _, commitWeight, filteredView :=
+	ourBalance, _, commitWeight, filteredView, _, _ :=
 		lc.computeView(htlcView, false, false)
 
 	// If we are the channel initiator, we must remember to subtract the
@@ -6244,37 +6343,32 @@ func CreateCommitTx(fundingOutput wire.TxIn,
 	commitTx := wire.NewMsgTx(2)
 	commitTx.AddTxIn(&fundingOutput)
 
-	txOutBaseIndex := 0
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+	if tokenId != nil && tokenId.IsValid() {
 		AddTokenSendTxout(commitTx, tokenId, int64(amountToSelfToken + amountToThemToken))
-		txOutBaseIndex = 1
 	}
-
 
 	// Avoid creating dust outputs within the commitment transaction.
 	if amountToSelf >= dustLimit {
-		commitTx.AddTxOut(&wire.TxOut{
+		out := &wire.TxOut{
 			PkScript: payToUsScriptHash,
 			Value:    int64(amountToSelf),
-		})
+		}
+		if tokenId != nil && tokenId.IsValid()  {
+			out.TokenId.SetBytes(tokenId[:])
+			out.TokenValue = int64(amountToSelfToken)
+		}
+		commitTx.AddTxOut(out)
 	}
 	if amountToThem >= dustLimit {
-		commitTx.AddTxOut(&wire.TxOut{
+		out := &wire.TxOut{
 			PkScript: theirWitnessKeyHash,
 			Value:    int64(amountToThem),
-		})
-	}
-
-	if tokenId != nil && *tokenId != wire.EmptyTokenId  {
-		commitTx.TxOut[txOutBaseIndex].TokenId.SetBytes(tokenId[:])
-		commitTx.TxOut[txOutBaseIndex].TokenValue = int64(amountToSelfToken)
-
-		commitTx.TxOut[txOutBaseIndex + 1].TokenId.SetBytes(tokenId[:])
-		commitTx.TxOut[txOutBaseIndex + 1].TokenValue = int64(amountToThemToken)
-
-		if commitTx.TxOut[txOutBaseIndex].Value < wire.DefaultTokenCommitmentTxVoutValue || commitTx.TxOut[txOutBaseIndex + 1].Value < wire.DefaultTokenCommitmentTxVoutValue {
-			return nil, ErrInsufficientFee
 		}
+		if tokenId != nil && tokenId.IsValid()  {
+			out.TokenId.SetBytes(tokenId[:])
+			out.TokenValue = int64(amountToThemToken)
+		}
+		commitTx.AddTxOut(out)
 	}
 
 	return commitTx, nil
@@ -6289,7 +6383,7 @@ func CreateCommitTx(fundingOutput wire.TxIn,
 func CreateCooperativeCloseTx(fundingTxIn wire.TxIn,
 	localDust, remoteDust, ourBalance, theirBalance btcutil.Amount,
 	ourDeliveryScript, theirDeliveryScript []byte,
-	initiator bool, tokenId *wire.TokenId, fundingFeeChange btcutil.Amount) *wire.MsgTx {
+	tokenId *wire.TokenId, ourTokenBalance, theirTokenBalance btcutil.Amount) *wire.MsgTx {
 
 	// Construct the transaction to perform a cooperative closure of the
 	// channel. In the event that one side doesn't have any settled funds
@@ -6298,41 +6392,33 @@ func CreateCooperativeCloseTx(fundingTxIn wire.TxIn,
 	closeTx := wire.NewMsgTx(2)
 	closeTx.AddTxIn(&fundingTxIn)
 
-	txOutBaseIndex := 0
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
+	if tokenId != nil && tokenId.IsValid() {
 		AddTokenSendTxout(closeTx, tokenId, int64(ourBalance + theirBalance))
-		txOutBaseIndex = 1
 	}
 
 	// Create both cooperative closure outputs, properly respecting the
 	// dust limits of both parties.
 	if ourBalance >= localDust {
-		closeTx.AddTxOut(&wire.TxOut{
+		out := &wire.TxOut{
 			PkScript: ourDeliveryScript,
 			Value:    int64(ourBalance),
-		})
+		}
+		if tokenId != nil && tokenId.IsValid() {
+			out.TokenId.SetBytes(tokenId[:])
+			out.TokenValue = int64(ourTokenBalance)
+		}
+		closeTx.AddTxOut(out)
 	}
 	if theirBalance >= remoteDust {
-		closeTx.AddTxOut(&wire.TxOut{
+		out := &wire.TxOut{
 			PkScript: theirDeliveryScript,
 			Value:    int64(theirBalance),
-		})
-	}
-
-	if tokenId != nil && *tokenId != wire.EmptyTokenId {
-		closeTx.TxOut[txOutBaseIndex].TokenId.SetBytes(tokenId[:])
-		closeTx.TxOut[txOutBaseIndex].TokenValue = closeTx.TxOut[txOutBaseIndex].Value
-
-		closeTx.TxOut[txOutBaseIndex + 1].TokenId.SetBytes(tokenId[:])
-		closeTx.TxOut[txOutBaseIndex + 1].TokenValue = closeTx.TxOut[txOutBaseIndex + 1].Value
-
-		if initiator {
-			closeTx.TxOut[txOutBaseIndex].Value = int64(fundingFeeChange) - wire.DefaultTokenTxVoutMinValue
-			closeTx.TxOut[txOutBaseIndex + 1].Value = wire.DefaultTokenTxVoutMinValue
-		} else {
-			closeTx.TxOut[txOutBaseIndex].Value = wire.DefaultTokenTxVoutMinValue
-			closeTx.TxOut[txOutBaseIndex + 1].Value = int64(fundingFeeChange) - wire.DefaultTokenTxVoutMinValue
 		}
+		if tokenId != nil && tokenId.IsValid() {
+			out.TokenId.SetBytes(tokenId[:])
+			out.TokenValue = int64(theirTokenBalance)
+		}
+		closeTx.AddTxOut(out)
 	}
 
 	txsort.InPlaceSort(closeTx)
@@ -6456,9 +6542,8 @@ func (lc *LightningChannel) FwdMinHtlc() lnwire.MilliSatoshi {
 	return lc.localChanCfg.MinHTLC
 }
 
-
 func AddTokenSendTxout(tx *wire.MsgTx, tokenId *wire.TokenId, totalTokenAmount int64) {
-	if tokenId != nil && *tokenId != wire.EmptyTokenId && totalTokenAmount > 0 {
+	if tokenId != nil && tokenId.IsValid() && totalTokenAmount > 0 {
 
 		var scriptHeader [4]byte
 		scriptHeader[0] = 0xb8	// OP_TOKEN

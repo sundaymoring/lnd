@@ -523,7 +523,15 @@ type OpenChannel struct {
 	TokenId wire.TokenId
 	// TokenCapacity is the total token capacity of this channel.
 	TokenCapacity btcutil.Amount
-	FundingTime uint32
+
+	// TotalMSatSent is the total number of milli-satoshis we've sent
+	// within this channel.
+	TokenTotalMSatSent lnwire.MilliSatoshi
+
+	// TotalMSatReceived is the total number of milli-satoshis we've
+	// received within this channel.
+	TokenTotalMSatReceived lnwire.MilliSatoshi
+
 }
 
 // FullSync serializeputChanInfos, and writes to disk the *full* channel state, using
@@ -1101,6 +1109,7 @@ type HTLC struct {
 
 	// Amt is the amount of milli-satoshis this HTLC escrows.
 	Amt lnwire.MilliSatoshi
+	TokenAmt lnwire.MilliSatoshi
 
 	// RefundTimeout is the absolute timeout on the HTLC that the sender
 	// must wait before reclaiming the funds in limbo.
@@ -1143,7 +1152,7 @@ func SerializeHtlcs(b io.Writer, htlcs ...HTLC) error {
 
 	for _, htlc := range htlcs {
 		if err := WriteElements(b,
-			htlc.Signature, htlc.RHash, htlc.Amt, htlc.RefundTimeout,
+			htlc.Signature, htlc.RHash, htlc.Amt, htlc.TokenAmt, htlc.RefundTimeout,
 			htlc.OutputIndex, htlc.Incoming, htlc.OnionBlob[:],
 			htlc.HtlcIndex, htlc.LogIndex,
 		); err != nil {
@@ -1174,7 +1183,7 @@ func DeserializeHtlcs(r io.Reader) ([]HTLC, error) {
 	htlcs = make([]HTLC, numHtlcs)
 	for i := uint16(0); i < numHtlcs; i++ {
 		if err := ReadElements(r,
-			&htlcs[i].Signature, &htlcs[i].RHash, &htlcs[i].Amt,
+			&htlcs[i].Signature, &htlcs[i].RHash, &htlcs[i].Amt, &htlcs[i].TokenAmt,
 			&htlcs[i].RefundTimeout, &htlcs[i].OutputIndex,
 			&htlcs[i].Incoming, &htlcs[i].OnionBlob,
 			&htlcs[i].HtlcIndex, &htlcs[i].LogIndex,
@@ -1191,6 +1200,7 @@ func (h *HTLC) Copy() HTLC {
 	clone := HTLC{
 		Incoming:      h.Incoming,
 		Amt:           h.Amt,
+		TokenAmt:	   h.TokenAmt,
 		RefundTimeout: h.RefundTimeout,
 		OutputIndex:   h.OutputIndex,
 	}
@@ -1989,6 +1999,7 @@ type ChannelCloseSummary struct {
 
 	// Capacity was the total capacity of the channel.
 	Capacity btcutil.Amount
+	TokenCapacity btcutil.Amount
 
 	// CloseHeight is the height at which the funding transaction was
 	// spent.
@@ -1998,6 +2009,7 @@ type ChannelCloseSummary struct {
 	// channel closure. This _does not_ include the sum of any outputs that
 	// have been time-locked as a result of the unilateral channel closure.
 	SettledBalance btcutil.Amount
+	TokenSettledBalance btcutil.Amount
 
 	// TimeLockedBalance is the sum of all the time-locked outputs at the
 	// time of channel closure. If we triggered the force closure of this
@@ -2006,6 +2018,7 @@ type ChannelCloseSummary struct {
 	// force closure, then this value will be non-zero if we had any
 	// outstanding outgoing HTLC's at the time of channel closure.
 	TimeLockedBalance btcutil.Amount
+	TokenTimeLockedBalance btcutil.Amount
 
 	// CloseType details exactly _how_ the channel was closed. Five closure
 	// types are possible: cooperative, local force, remote force, breach
@@ -2159,6 +2172,8 @@ type ChannelSnapshot struct {
 	// for token
 	TokenId wire.TokenId
 	TokenCapacity btcutil.Amount
+	TokenTotalMSatSent lnwire.MilliSatoshi
+	TokenTotalMSatReceived lnwire.MilliSatoshi
 }
 
 // Snapshot returns a read-only snapshot of the current channel state. This
@@ -2183,6 +2198,8 @@ func (c *OpenChannel) Snapshot() *ChannelSnapshot {
 			CommitFee:     localCommit.CommitFee,
 		},
 		TokenCapacity:		c.TokenCapacity,
+		TokenTotalMSatSent: c.TokenTotalMSatSent,
+		TokenTotalMSatReceived: c.TokenTotalMSatReceived,
 	}
 
 	snapshot.TokenId.SetBytes(c.TokenId[:])
@@ -2267,6 +2284,7 @@ func serializeChannelCloseSummary(w io.Writer, cs *ChannelCloseSummary) error {
 		cs.ChanPoint, cs.ShortChanID, cs.ChainHash, cs.ClosingTXID,
 		cs.CloseHeight, cs.RemotePub, cs.Capacity, cs.SettledBalance,
 		cs.TimeLockedBalance, cs.CloseType, cs.IsPending,
+		cs.TokenCapacity, cs.TokenSettledBalance, cs.TokenTimeLockedBalance,
 	)
 	if err != nil {
 		return err
@@ -2345,6 +2363,7 @@ func deserializeCloseChannelSummary(r io.Reader) (*ChannelCloseSummary, error) {
 		&c.ChanPoint, &c.ShortChanID, &c.ChainHash, &c.ClosingTXID,
 		&c.CloseHeight, &c.RemotePub, &c.Capacity, &c.SettledBalance,
 		&c.TimeLockedBalance, &c.CloseType, &c.IsPending,
+		&c.TokenCapacity, &c.TokenSettledBalance, &c.TokenTimeLockedBalance,
 	)
 	if err != nil {
 		return nil, err
@@ -2437,7 +2456,8 @@ func putChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		channel.NumConfsRequired, channel.ChannelFlags,
 		channel.IdentityPub, channel.Capacity, channel.TotalMSatSent,
 		channel.TotalMSatReceived,
-		channel.TokenId, channel.TokenCapacity, channel.FundingTime,
+		channel.TokenId, channel.TokenCapacity,
+		channel.TokenTotalMSatSent, channel.TokenTotalMSatReceived,
 	); err != nil {
 		return err
 	}
@@ -2558,7 +2578,8 @@ func fetchChanInfo(chanBucket *bbolt.Bucket, channel *OpenChannel) error {
 		&channel.NumConfsRequired, &channel.ChannelFlags,
 		&channel.IdentityPub, &channel.Capacity, &channel.TotalMSatSent,
 		&channel.TotalMSatReceived,
-		&channel.TokenId, &channel.TokenCapacity, &channel.FundingTime,
+		&channel.TokenId, &channel.TokenCapacity,
+		&channel.TokenTotalMSatSent, &channel.TokenTotalMSatReceived,
 	); err != nil {
 		return err
 	}

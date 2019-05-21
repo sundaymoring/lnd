@@ -163,7 +163,8 @@ func (o *OpenChannel) Encode(w io.Writer, pver uint32) error {
 		o.ChannelFlags,
 
 		o.TokenId,
-		o.FundingFeeAmt,
+		o.FundingTokenAmount,
+		o.PushTokenAmount,
 		o.FundingTime,
 	)
 }
@@ -195,7 +196,8 @@ func (o *OpenChannel) Decode(r io.Reader, pver uint32) error {
 		&o.ChannelFlags,
 
 		&o.TokenId,
-		&o.FundingFeeAmt,
+		&o.FundingTokenAmount,
+		&o.PushTokenAmount,
 		&o.FundingTime,
 	)
 }
@@ -213,6 +215,6 @@ func (o *OpenChannel) MsgType() MessageType {
 //
 // This is part of the lnwire.Message interface.
 func (o *OpenChannel) MaxPayloadLength(uint32) uint32 {
-	// (32 * 2) + (8 * 6) + (4 * 1) + (2 * 2) + (33 * 6) + 1  + 36 + (8 * 1) +  （4 × 1）
-	return 319 + 48
+	// (32 * 2) + (8 * 6) + (4 * 1) + (2 * 2) + (33 * 6) + 1  + 36 + (8 * 2) +  （4 × 1）
+	return 319 + 56
 }

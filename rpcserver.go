@@ -1232,7 +1232,7 @@ func (r *rpcServer) GetTokenIdWithSymbol(symbol string) (*wire.TokenId, error) {
 }
 
 func (r *rpcServer) GetSymbolWithTokenId(tokenId *wire.TokenId) (string, error) {
-	if *tokenId == wire.EmptyTokenId {
+	if tokenId == nil || !tokenId.IsValid() {
 		return "", nil
 	}
 
@@ -1346,7 +1346,7 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 
 	localFundingTokenAmt := btcutil.Amount(0)
 	remoteInitialTokenBalance := btcutil.Amount(0)
-	if *tokenId != wire.EmptyTokenId {
+	if tokenId != nil && tokenId.IsValid() {
 		localFundingTokenAmt = localFundingAmt
 		remoteInitialTokenBalance = remoteInitialBalance
 
@@ -1518,7 +1518,7 @@ func (r *rpcServer) OpenChannelSync(ctx context.Context,
 
 	localFundingTokenAmt := btcutil.Amount(0)
 	remoteInitialTokenBalance := btcutil.Amount(0)
-	if *tokenId != wire.EmptyTokenId {
+	if tokenId != nil && tokenId.IsValid() {
 		localFundingTokenAmt = localFundingAmt
 		remoteInitialTokenBalance = remoteInitialBalance
 

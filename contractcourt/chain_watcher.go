@@ -501,8 +501,8 @@ func (c *chainWatcher) closeObserver(spendNtfn *chainntnfs.SpendEvent) {
 // to a script that the wallet controls. If no outputs pay to us, then we
 // return zero. This is possible as our output may have been trimmed due to
 // being dust.
-func (c *chainWatcher) toSelfAmount(tx *wire.MsgTx) btcutil.Amount {
-	var selfAmt btcutil.Amount
+func (c *chainWatcher) toSelfAmount(tx *wire.MsgTx) (btcutil.Amount, btcutil.Amount) {
+	var selfAmt, selfTokenAmt btcutil.Amount
 	for _, txOut := range tx.TxOut {
 		_, addrs, _, err := txscript.ExtractPkScriptAddrs(
 			// Doesn't matter what net we actually pass in.
@@ -514,16 +514,15 @@ func (c *chainWatcher) toSelfAmount(tx *wire.MsgTx) btcutil.Amount {
 
 		for _, addr := range addrs {
 			if c.cfg.isOurAddr(addr) {
-				if txOut.TokenId == wire.EmptyTokenId {
-					selfAmt += btcutil.Amount(txOut.Value)
-				} else {
-					selfAmt += btcutil.Amount(txOut.TokenValue)
+				selfAmt += btcutil.Amount(txOut.Value)
+				if !txOut.TokenId.IsValid() {
+					selfTokenAmt += btcutil.Amount(txOut.TokenValue)
 				}
 			}
 		}
 	}
 
-	return selfAmt
+	return selfAmt, selfTokenAmt
 }
 
 // dispatchCooperativeClose processed a detect cooperative channel closure.
@@ -539,7 +538,7 @@ func (c *chainWatcher) dispatchCooperativeClose(commitSpend *chainntnfs.SpendDet
 
 	// If the input *is* final, then we'll check to see which output is
 	// ours.
-	localAmt := c.toSelfAmount(broadcastTx)
+	localAmt, localTokenAmt := c.toSelfAmount(broadcastTx)
 
 	// Once this is known, we'll mark the state as fully closed in the
 	// database. We can do this as a cooperatively closed channel has all
@@ -550,8 +549,10 @@ func (c *chainWatcher) dispatchCooperativeClose(commitSpend *chainntnfs.SpendDet
 		ClosingTXID:             *commitSpend.SpenderTxHash,
 		RemotePub:               c.cfg.chanState.IdentityPub,
 		Capacity:                c.cfg.chanState.Capacity,
+		TokenCapacity:           c.cfg.chanState.TokenCapacity,
 		CloseHeight:             uint32(commitSpend.SpendingHeight),
 		SettledBalance:          localAmt,
+		TokenSettledBalance:     localTokenAmt,
 		CloseType:               channeldb.CooperativeClose,
 		ShortChanID:             c.cfg.chanState.ShortChanID(),
 		IsPending:               true,
@@ -616,6 +617,7 @@ func (c *chainWatcher) dispatchLocalForceClose(
 		ClosingTXID:             forceClose.CloseTx.TxHash(),
 		RemotePub:               &chanSnapshot.RemoteIdentity,
 		Capacity:                chanSnapshot.Capacity,
+		TokenCapacity:           chanSnapshot.TokenCapacity,
 		CloseType:               channeldb.LocalForceClose,
 		IsPending:               true,
 		ShortChanID:             c.cfg.chanState.ShortChanID(),
@@ -631,13 +633,13 @@ func (c *chainWatcher) dispatchLocalForceClose(
 	if forceClose.CommitResolution != nil {
 		closeSummary.SettledBalance = chanSnapshot.LocalBalance.ToSatoshis()
 		closeSummary.TimeLockedBalance = chanSnapshot.LocalBalance.ToSatoshis()
+
+		closeSummary.TokenSettledBalance = chanSnapshot.LocalTokenBalance.ToSatoshis()
+		closeSummary.TokenTimeLockedBalance = chanSnapshot.LocalTokenBalance.ToSatoshis()
 	}
 	for _, htlc := range forceClose.HtlcResolutions.OutgoingHTLCs {
-		if chanSnapshot.TokenId == wire.EmptyTokenId {
-			closeSummary.TimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.Value)
-		} else {
-			closeSummary.TimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.TokenValue)
-		}
+		closeSummary.TimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.Value)
+		closeSummary.TokenTimeLockedBalance += btcutil.Amount(htlc.SweepSignDesc.Output.TokenValue)
 	}
 
 	// Attempt to add a channel sync message to the close summary.
@@ -802,6 +804,7 @@ func (c *chainWatcher) dispatchContractBreach(spendEvent *chainntnfs.SpendDetail
 	// TODO(roasbeef): instead mark we got all the monies?
 	// TODO(halseth): move responsibility to breach arbiter?
 	settledBalance := remoteCommit.LocalBalance.ToSatoshis()
+	settledTokenBalance := remoteCommit.LocalTokenBalance.ToSatoshis()
 	closeSummary := channeldb.ChannelCloseSummary{
 		ChanPoint:               c.cfg.chanState.FundingOutpoint,
 		ChainHash:               c.cfg.chanState.ChainHash,
@@ -809,7 +812,9 @@ func (c *chainWatcher) dispatchContractBreach(spendEvent *chainntnfs.SpendDetail
 		CloseHeight:             spendHeight,
 		RemotePub:               c.cfg.chanState.IdentityPub,
 		Capacity:                c.cfg.chanState.Capacity,
+		TokenCapacity:           c.cfg.chanState.TokenCapacity,
 		SettledBalance:          settledBalance,
+		TokenSettledBalance:     settledTokenBalance,
 		CloseType:               channeldb.BreachClose,
 		IsPending:               true,
 		ShortChanID:             c.cfg.chanState.ShortChanID(),

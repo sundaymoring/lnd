@@ -848,7 +848,7 @@ func TestCommitmentAndHTLCTransactions(t *testing.T) {
 		htlcResolutions, err := extractHtlcResolutions(
 			SatPerKWeight(test.commitment.FeePerKw), true, signer,
 			htlcs, keys, channel.localChanCfg, channel.remoteChanCfg,
-			commitTx.TxHash(), pCache,
+			commitTx.TxHash(), pCache, nil
 		)
 		if err != nil {
 			t.Errorf("Case %d: Failed to extract HTLC resolutions: %v", i, err)

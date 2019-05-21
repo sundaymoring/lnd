@@ -229,17 +229,17 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// restrictions.  All amounts in a transaction are in a unit value known
 	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
 	// SatoshiPerBitcoin constant.
-	var totalSatoshi int64
+	var totalSatoshi, totalTokenSatoshi int64
 	for _, txOut := range msgTx.TxOut {
 		satoshi := txOut.Value
-		if satoshi < 0 {
+		if satoshi < 0 || txOut.TokenValue < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
-				"value of %v", satoshi)
+				"value of %v (token: %v)", satoshi, txOut.TokenValue)
 			return ruleError(ErrBadTxOutValue, str)
 		}
-		if satoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v", satoshi,
+		if satoshi > btcutil.MaxSatoshi || txOut.TokenValue > btcutil.MaxSatoshi {
+			str := fmt.Sprintf("transaction output value of %v (token: %v) is "+
+				"higher than max allowed value of %v", satoshi, txOut.TokenValue,
 				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
@@ -248,16 +248,17 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 		// is detected and reported.  This is impossible for Bitcoin, but
 		// perhaps possible if an alt increases the total money supply.
 		totalSatoshi += satoshi
-		if totalSatoshi < 0 {
+		totalTokenSatoshi += txOut.TokenValue
+		if totalSatoshi < 0 || totalTokenSatoshi < 0{
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs exceeds max allowed value of %v",
 				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
-		if totalSatoshi > btcutil.MaxSatoshi {
+		if totalSatoshi > btcutil.MaxSatoshi || totalTokenSatoshi > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
-				"outputs is %v which is higher than max "+
-				"allowed value of %v", totalSatoshi,
+				"outputs is %v (token: %v) which is higher than max "+
+				"allowed value of %v", totalSatoshi, totalTokenSatoshi,
 				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
