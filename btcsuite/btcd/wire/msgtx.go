@@ -113,7 +113,7 @@ const (
 	TokenIdSize                      = 36
 	MaxTokenIdStringSize = TokenIdSize * 2
 
-	DefaultTokenTxVoutMinValue int64 = 0.0015
+	DefaultTokenTxVoutMinValue int64 = 150000
 	DefaultTokenCommitmentTxVoutValue int64 = DefaultTokenTxVoutMinValue * 500
 )
 
