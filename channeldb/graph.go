@@ -2057,6 +2057,9 @@ type ChannelEdgeInfo struct {
 	// and the last 2 bytes are the output index for the channel.
 	ChannelID uint64
 
+	// for token
+	TokenId wire.TokenId
+
 	// ChainHash is the hash that uniquely identifies the chain that this
 	// channel was opened within.
 	//

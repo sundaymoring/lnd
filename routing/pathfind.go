@@ -3,6 +3,8 @@ package routing
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"math"
 
 	"container/heap"
@@ -429,7 +431,7 @@ type RestrictParams struct {
 // that need to be paid along the path and accurately check the amount
 // to forward at every node against the available bandwidth.
 func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
-	amt lnwire.MilliSatoshi/*, tokenId wire.TokenId, tokenMaxFee btcutil.Amount*/) ([]*channeldb.ChannelEdgePolicy, error) {
+	amt lnwire.MilliSatoshi, tokenId *wire.TokenId, tokenMaxFee btcutil.Amount) ([]*channeldb.ChannelEdgePolicy, error) {
 
 	var err error
 	tx := g.tx
@@ -698,6 +700,10 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			// so this node would have come prior to the pivot
 			// node in the route.
 			if inEdge == nil {
+				return nil
+			}
+
+			if *tokenId != edgeInfo.TokenId {
 				return nil
 			}
 

@@ -203,6 +203,7 @@ type Config struct {
 type routeTuple struct {
 	amt  lnwire.MilliSatoshi
 	dest [33]byte
+	tokenId wire.TokenId
 }
 
 // newRouteTuple creates a new route tuple from the target and amount.
@@ -1326,7 +1327,7 @@ func pathsToFeeSortedRoutes(source Vertex, paths [][]*channeldb.ChannelEdgePolic
 // route that will be ranked the highest is the one with the lowest cumulative
 // fee along the route.
 func (r *ChannelRouter) FindRoutes(source, target Vertex,
-	amt lnwire.MilliSatoshi, restrictions *RestrictParams, numPaths uint32,
+	amt lnwire.MilliSatoshi, restrictions *RestrictParams, numPaths uint32, tokenId wire.TokenId,
 	finalExpiry ...uint16) ([]*Route, error) {
 
 	var finalCLTVDelta uint16

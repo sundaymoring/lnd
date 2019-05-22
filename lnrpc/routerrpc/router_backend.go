@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/lnrpc"
@@ -29,7 +30,7 @@ type RouterBackend struct {
 	// routes.
 	FindRoutes func(source, target routing.Vertex,
 		amt lnwire.MilliSatoshi, restrictions *routing.RestrictParams,
-		numPaths uint32, finalExpiry ...uint16) (
+		numPaths uint32, tokenId wire.TokenId, finalExpiry ...uint16) (
 		[]*routing.Route, error)
 }
 
@@ -79,6 +80,11 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 	} else {
 		// If no source is specified, use self.
 		sourcePubKey = r.SelfNode
+	}
+
+	tokenId, err := wire.NewTokenIdFromStr(in.TokenId)
+	if err != nil {
+		return nil, err
 	}
 
 	// Currently, within the bootstrap phase of the network, we limit the
@@ -138,12 +144,12 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 	if in.FinalCltvDelta == 0 {
 		routes, findErr = r.FindRoutes(
 			sourcePubKey, targetPubKey, amtMSat, restrictions,
-			numRoutesIn,
+			numRoutesIn, *tokenId,
 		)
 	} else {
 		routes, findErr = r.FindRoutes(
 			sourcePubKey, targetPubKey, amtMSat, restrictions,
-			numRoutesIn, uint16(in.FinalCltvDelta),
+			numRoutesIn, *tokenId, uint16(in.FinalCltvDelta),
 		)
 	}
 	if findErr != nil {
