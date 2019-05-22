@@ -1312,7 +1312,7 @@ func (l *LightningWallet) WithCoinSelectLock(f func() error) error {
 // also be generated.
 func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	amt btcutil.Amount, minConfs int32,
-	contribution *ChannelContribution, tokenId *wire.TokenId, fundingFeeAmt btcutil.Amount) error {
+	contribution *ChannelContribution, tokenId *wire.TokenId, amtToken btcutil.Amount) error {
 
 	// We hold the coin select mutex while querying for outputs, and
 	// performing coin selection in order to avoid inadvertent double
@@ -1333,7 +1333,7 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	// Perform coin selection over our available, unlocked unspent outputs
 	// in order to find enough coins to meet the funding amount
 	// requirements.
-	selectedCoins, changeAmt, changeTokenAmt, err := coinSelect(feeRate, amt, tokenId, coins)
+	selectedCoins, changeAmt, changeTokenAmt, err := coinSelect(feeRate, amt, amtToken, tokenId, coins)
 	if err != nil {
 		return err
 	}
@@ -1459,15 +1459,11 @@ func selectInputs(amt btcutil.Amount, amtToken btcutil.Amount, tokenId *wire.Tok
 // specified fee rate should be expressed in sat/kw for coin selection to
 // function properly.
 // note: amt represent token amt, and btc amt is a default amount.
-func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount, tokenId *wire.TokenId,
+func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount, amtToken btcutil.Amount, tokenId *wire.TokenId,
 	coins []*Utxo) (utxos []*Utxo, changeAmt btcutil.Amount, tokenChangeAmt btcutil.Amount, err error) {
 
 	amtNeeded := amt
-	amtTokenNeeded := btcutil.Amount(0)
-	if *tokenId != wire.BtcTokenId {
-		amtNeeded = DefaultBtcValueInTokenTx
-		amtTokenNeeded = amt
-	}
+	amtTokenNeeded := amtToken
 	for {
 		// First perform an initial round of coin selection to estimate
 		// the required fee.
