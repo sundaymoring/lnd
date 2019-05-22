@@ -119,6 +119,7 @@ const (
 
 type TokenId [TokenIdSize]byte
 var EmptyTokenId = TokenId{}
+var BtcTokenId = EmptyTokenId
 var ErrTokenIdStrSize = fmt.Errorf("max tokenId string length is %v bytes", MaxTokenIdStringSize)
 
 func (tokenId *TokenId) SetBytes(newTokenId []byte) error {

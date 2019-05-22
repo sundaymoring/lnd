@@ -30,6 +30,10 @@ const (
 	msgBufferSize = 100
 )
 
+var (
+	DefaultBtcValueInTokenTx = btcutil.Amount(1000000)
+)
+
 // ErrInsufficientFunds is a type matching the error interface which is
 // returned when coin selection for a new funding transaction fails to due
 // having an insufficient amount of confirmed funds.
@@ -1329,7 +1333,7 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	// Perform coin selection over our available, unlocked unspent outputs
 	// in order to find enough coins to meet the funding amount
 	// requirements.
-	selectedCoins, changeAmt, err := coinSelect(feeRate, amt, coins)
+	selectedCoins, changeAmt, changeTokenAmt, err := coinSelect(feeRate, amt, tokenId, coins)
 	if err != nil {
 		return err
 	}
@@ -1351,6 +1355,25 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	// Record any change output(s) generated as a result of the coin
 	// selection, but only if the addition of the output won't lead to the
 	// creation of dust.
+	if changeTokenAmt != 0 {
+		changeAddr, err := l.NewAddress(WitnessPubKey, true)
+		if err != nil {
+			return err
+		}
+		changeScript, err := txscript.PayToAddrScript(changeAddr)
+		if err != nil {
+			return err
+		}
+
+		contribution.ChangeOutputs = make([]*wire.TxOut, 1)
+		contribution.ChangeOutputs[0] = &wire.TxOut{
+			Value:    int64(DefaultBtcValueInTokenTx),
+			TokenValue: int64(changeTokenAmt),
+			TokenId: *tokenId,
+			PkScript: changeScript,
+		}
+		changeAmt -= DefaultBtcValueInTokenTx
+	}
 	if changeAmt != 0 && changeAmt > DefaultDustLimit() {
 		changeAddr, err := l.NewAddress(WitnessPubKey, true)
 		if err != nil {
@@ -1364,6 +1387,8 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 		contribution.ChangeOutputs = make([]*wire.TxOut, 1)
 		contribution.ChangeOutputs[0] = &wire.TxOut{
 			Value:    int64(changeAmt),
+			TokenValue: int64(0),
+			TokenId: wire.BtcTokenId,
 			PkScript: changeScript,
 		}
 	}
@@ -1412,31 +1437,43 @@ func initStateHints(commit1, commit2 *wire.MsgTx,
 // funds, a non-nil error is returned. Additionally, the total amount of the
 // selected coins are returned in order for the caller to properly handle
 // change+fees.
-func selectInputs(amt btcutil.Amount, coins []*Utxo) (btcutil.Amount, []*Utxo, error) {
+// note: amt represent token amt. tokeid represent btc or other token coin.
+func selectInputs(amt btcutil.Amount, amtToken btcutil.Amount, tokenId *wire.TokenId, coins []*Utxo) (btcutil.Amount, btcutil.Amount, []*Utxo, error) {
 	satSelected := btcutil.Amount(0)
+	satTokenSelected := btcutil.Amount(0)
 	for i, coin := range coins {
+		if *tokenId != coin.TokenId {
+			continue
+		}
 		satSelected += coin.Value
-		if satSelected >= amt {
-			return satSelected, coins[:i+1], nil
+		satTokenSelected += coin.TokenValue
+		if satSelected >= amt && satTokenSelected >= amtToken {
+			return satSelected, satTokenSelected, coins[:i+1], nil
 		}
 	}
-	return 0, nil, &ErrInsufficientFunds{amt, satSelected}
+	return 0, 0, nil, &ErrInsufficientFunds{amt, satSelected}
 }
 
 // coinSelect attempts to select a sufficient amount of coins, including a
 // change output to fund amt satoshis, adhering to the specified fee rate. The
 // specified fee rate should be expressed in sat/kw for coin selection to
 // function properly.
-func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount,
-	coins []*Utxo) ([]*Utxo, btcutil.Amount, error) {
+// note: amt represent token amt, and btc amt is a default amount.
+func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount, tokenId *wire.TokenId,
+	coins []*Utxo) (utxos []*Utxo, changeAmt btcutil.Amount, tokenChangeAmt btcutil.Amount, err error) {
 
 	amtNeeded := amt
+	amtTokenNeeded := btcutil.Amount(0)
+	if *tokenId != wire.BtcTokenId {
+		amtNeeded = DefaultBtcValueInTokenTx
+		amtTokenNeeded = amt
+	}
 	for {
 		// First perform an initial round of coin selection to estimate
 		// the required fee.
-		totalSat, selectedUtxos, err := selectInputs(amtNeeded, coins)
+		totalSat, totalTokenSat, selectedUtxos, err := selectInputs(amtNeeded, amtTokenNeeded, tokenId, coins)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, 0, err
 		}
 
 		var weightEstimate input.TxWeightEstimator
@@ -1448,7 +1485,7 @@ func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount,
 			case NestedWitnessPubKey:
 				weightEstimate.AddNestedP2WKHInput()
 			default:
-				return nil, 0, fmt.Errorf("Unsupported address type: %v",
+				return nil, 0, 0, fmt.Errorf("Unsupported address type: %v",
 					utxo.AddressType)
 			}
 		}
@@ -1462,10 +1499,15 @@ func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount,
 		// addresses.
 		weightEstimate.AddP2WKHOutput()
 
+		// assume that token change like btc
+		weightEstimate.AddP2WKHOutput()
+
 		// The difference between the selected amount and the amount
 		// requested will be used to pay fees, and generate a change
 		// output with the remaining.
-		overShootAmt := totalSat - amt
+		overShootAmt := totalSat - amtNeeded
+
+		overShootTokenAmt := totalTokenSat - amtTokenNeeded
 
 		// Based on the estimated size and fee rate, if the excess
 		// amount isn't enough to pay fees, then increase the requested
@@ -1481,7 +1523,7 @@ func coinSelect(feeRate SatPerKWeight, amt btcutil.Amount,
 		// If the fee is sufficient, then calculate the size of the
 		// change output.
 		changeAmt := overShootAmt - requiredFee
-
-		return selectedUtxos, changeAmt, nil
+		tokenChangeAmt := overShootTokenAmt
+		return selectedUtxos, changeAmt, tokenChangeAmt, nil
 	}
 }
