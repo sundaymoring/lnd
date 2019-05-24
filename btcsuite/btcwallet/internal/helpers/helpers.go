@@ -12,11 +12,21 @@ import (
 )
 
 // SumOutputValues sums up the list of TxOuts and returns an Amount.
-func SumOutputValues(outputs []*wire.TxOut) (totalOutput btcutil.Amount) {
+func SumOutputValues(outputs []*wire.TxOut) (btcutil.Amount, *wire.TokenId, btcutil.Amount) {
+
+	var totalOutput, totalTokenOutput btcutil.Amount
+	tokenId := &wire.TokenId{}
 	for _, txOut := range outputs {
 		totalOutput += btcutil.Amount(txOut.Value)
+		if txOut.TokenId.IsValid() {
+			if !tokenId.IsValid() {
+				tokenId.SetBytes(txOut.TokenId[:])
+			}
+
+			totalTokenOutput += btcutil.Amount(txOut.TokenValue)
+		}
 	}
-	return totalOutput
+	return totalOutput, tokenId, totalTokenOutput
 }
 
 // SumOutputSerializeSizes sums up the serialized size of the supplied outputs.

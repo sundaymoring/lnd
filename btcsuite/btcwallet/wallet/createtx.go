@@ -35,23 +35,28 @@ func makeInputSource(eligible []wtxmgr.Credit) txauthor.InputSource {
 	// Current inputs and their total value.  These are closed over by the
 	// returned input source and reused across multiple calls.
 	currentTotal := btcutil.Amount(0)
+	currentTotalToken := btcutil.Amount(0)
 	currentInputs := make([]*wire.TxIn, 0, len(eligible))
 	currentScripts := make([][]byte, 0, len(eligible))
 	currentInputValues := make([]btcutil.Amount, 0, len(eligible))
 
-	return func(target btcutil.Amount) (btcutil.Amount, []*wire.TxIn,
+	return func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (btcutil.Amount, btcutil.Amount, []*wire.TxIn,
 		[]btcutil.Amount, [][]byte, error) {
 
-		for currentTotal < target && len(eligible) != 0 {
+		for currentTotal < target && currentTotalToken < targetToken && len(eligible) != 0 {
 			nextCredit := &eligible[0]
 			eligible = eligible[1:]
 			nextInput := wire.NewTxIn(&nextCredit.OutPoint, nil, nil)
 			currentTotal += nextCredit.Amount
+			if tokenId != nil && tokenId.IsValid() && tokenId.IsEqual(&nextCredit.TokenId) {
+				currentTotalToken += nextCredit.TokenAmount
+			}
 			currentInputs = append(currentInputs, nextInput)
 			currentScripts = append(currentScripts, nextCredit.PkScript)
 			currentInputValues = append(currentInputValues, nextCredit.Amount)
 		}
-		return currentTotal, currentInputs, currentInputValues, currentScripts, nil
+
+		return currentTotal, currentTotalToken, currentInputs, currentInputValues, currentScripts, nil
 	}
 }
 
@@ -187,8 +192,10 @@ func (w *Wallet) txToOutputs(outputs []*wire.TxOut, account uint32,
 
 	if tx.ChangeIndex >= 0 && account == waddrmgr.ImportedAddrAccount {
 		changeAmount := btcutil.Amount(tx.Tx.TxOut[tx.ChangeIndex].Value)
+		changeTokenAmount := btcutil.Amount(tx.Tx.TxOut[tx.ChangeIndex].TokenValue)
 		log.Warnf("Spend from imported account produced change: moving"+
-			" %v from imported account into default account.", changeAmount)
+			" %v (token: %v) from imported account into default account.",
+			changeAmount, changeTokenAmount)
 	}
 
 	// Finally, we'll request the backend to notify us of the transaction

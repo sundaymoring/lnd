@@ -140,29 +140,31 @@ func (noInputValue) Error() string { return "no input value" }
 // looked up again by the wallet during the call to signrawtransaction.
 func makeInputSource(outputs []btcjson.ListUnspentResult) txauthor.InputSource {
 	var (
-		totalInputValue btcutil.Amount
+		totalInputValue, totalInputTokenValue btcutil.Amount
 		inputs          = make([]*wire.TxIn, 0, len(outputs))
 		inputValues     = make([]btcutil.Amount, 0, len(outputs))
 		sourceErr       error
 	)
 	for _, output := range outputs {
 		outputAmount, err := btcutil.NewAmount(output.Amount)
+		outputTokenAmount, err := btcutil.NewAmount(output.TokenAmount)
 		if err != nil {
 			sourceErr = fmt.Errorf(
 				"invalid amount `%v` in listunspent result",
 				output.Amount)
 			break
 		}
-		if outputAmount == 0 {
+		if outputAmount == 0 || outputTokenAmount == 0 {
 			continue
 		}
-		if !saneOutputValue(outputAmount) {
+		if !saneOutputValue(outputAmount) || !saneOutputValue(outputTokenAmount) {
 			sourceErr = fmt.Errorf(
-				"impossible output amount `%v` in listunspent result",
-				outputAmount)
+				"impossible output amount `%v (token: %v)` in listunspent result",
+				outputAmount, outputTokenAmount)
 			break
 		}
 		totalInputValue += outputAmount
+		totalInputTokenValue += outputTokenAmount
 
 		previousOutPoint, err := parseOutPoint(&output)
 		if err != nil {
@@ -180,8 +182,8 @@ func makeInputSource(outputs []btcjson.ListUnspentResult) txauthor.InputSource {
 		sourceErr = noInputValue{}
 	}
 
-	return func(btcutil.Amount) (btcutil.Amount, []*wire.TxIn, []btcutil.Amount, [][]byte, error) {
-		return totalInputValue, inputs, inputValues, nil, sourceErr
+	return func(btcutil.Amount, *wire.TokenId, btcutil.Amount) (btcutil.Amount, btcutil.Amount, []*wire.TxIn, []btcutil.Amount, [][]byte, error) {
+		return totalInputValue, totalInputTokenValue, inputs, inputValues, nil, sourceErr
 	}
 }
 

@@ -23,7 +23,7 @@ import (
 // can not be satisified, this can be signaled by returning a total amount less
 // than the target or by returning a more detailed error implementing
 // InputSourceError.
-type InputSource func(target btcutil.Amount) (total btcutil.Amount, inputs []*wire.TxIn,
+type InputSource func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (total, totalToken btcutil.Amount, inputs []*wire.TxIn,
 	inputValues []btcutil.Amount, scripts [][]byte, err error)
 
 // InputSourceError describes the failure to provide enough input value from
@@ -84,16 +84,17 @@ type ChangeSource func() ([]byte, error)
 func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 	fetchInputs InputSource, fetchChange ChangeSource) (*AuthoredTx, error) {
 
-	targetAmount := h.SumOutputValues(outputs)
+	targetAmount, tokenId, targetTokenAmount := h.SumOutputValues(outputs)
 	estimatedSize := txsizes.EstimateVirtualSize(0, 1, 0, outputs, true)
 	targetFee := txrules.FeeForSerializeSize(relayFeePerKb, estimatedSize)
 
 	for {
-		inputAmount, inputs, inputValues, scripts, err := fetchInputs(targetAmount + targetFee)
+		inputAmount, inputTokenAmount, inputs, inputValues, scripts, err := fetchInputs(targetAmount + targetFee, tokenId, targetTokenAmount)
 		if err != nil {
 			return nil, err
 		}
-		if inputAmount < targetAmount+targetFee {
+		if inputAmount < targetAmount+targetFee ||
+			(tokenId.IsValid() && inputTokenAmount < targetTokenAmount) {
 			return nil, insufficientFundsError{}
 		}
 
@@ -130,6 +131,7 @@ func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 		}
 		changeIndex := -1
 		changeAmount := inputAmount - targetAmount - maxRequiredFee
+		changeTokenAmount := inputTokenAmount - targetTokenAmount
 		if changeAmount != 0 && !txrules.IsDustAmount(changeAmount,
 			txsizes.P2WPKHPkScriptSize, relayFeePerKb) {
 			changeScript, err := fetchChange()
@@ -141,9 +143,19 @@ func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 					"scripts no larger than P2WPKH output scripts")
 			}
 			change := wire.NewTxOut(int64(changeAmount), changeScript)
+			if changeTokenAmount != 0 && !txrules.IsDustAmount(changeTokenAmount,
+				txsizes.P2WPKHPkScriptSize, relayFeePerKb) {
+				change.TokenId.SetBytes(tokenId[:])
+				change.TokenValue = int64(changeTokenAmount)
+			}
 			l := len(outputs)
 			unsignedTransaction.TxOut = append(outputs[:l:l], change)
 			changeIndex = l
+		} else {
+			if tokenId.IsValid() && !(changeTokenAmount != 0 && !txrules.IsDustAmount(changeTokenAmount,
+				txsizes.P2WPKHPkScriptSize, relayFeePerKb)) {
+				return nil, errors.New("value is too small for token output")
+			}
 		}
 
 		return &AuthoredTx{

@@ -72,9 +72,10 @@ func CheckOutput(output *wire.TxOut, relayFeePerKb btcutil.Amount) error {
 	if output.Value < 0 {
 		return ErrAmountNegative
 	}
-	if output.Value > btcutil.MaxSatoshi {
-		return ErrAmountExceedsMax
-	}
+	// remove max satothi limit
+	//if output.Value > btcutil.MaxSatoshi {
+	//	return ErrAmountExceedsMax
+	//}
 	if IsDustOutput(output, relayFeePerKb) {
 		return ErrOutputIsDust
 	}

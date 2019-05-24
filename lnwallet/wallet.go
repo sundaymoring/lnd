@@ -711,16 +711,24 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 		fundingTx.AddTxIn(theirInput)
 	}
 
-	if pendingReservation.partialState.TokenId.IsValid() {
-		AddTokenSendTxout(fundingTx, &pendingReservation.partialState.TokenId,
-			int64(pendingReservation.partialState.TokenCapacity))
-	}
-
+	var totalTokenAmt int64
 	for _, ourChangeOutput := range ourContribution.ChangeOutputs {
 		fundingTx.AddTxOut(ourChangeOutput)
+		if ourChangeOutput.TokenId.IsValid() {
+			totalTokenAmt += ourChangeOutput.TokenValue
+		}
 	}
 	for _, theirChangeOutput := range theirContribution.ChangeOutputs {
 		fundingTx.AddTxOut(theirChangeOutput)
+		if theirChangeOutput.TokenId.IsValid() {
+			totalTokenAmt += theirChangeOutput.TokenValue
+		}
+	}
+
+	if pendingReservation.partialState.TokenId.IsValid() {
+		totalTokenAmt += int64(pendingReservation.partialState.TokenCapacity)
+		AddTokenSendTxout(fundingTx, &pendingReservation.partialState.TokenId,
+			totalTokenAmt)
 	}
 
 	ourKey := pendingReservation.ourContribution.MultiSigKey

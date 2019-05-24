@@ -27,18 +27,22 @@ func p2pkhOutputs(amounts ...btcutil.Amount) []*wire.TxOut {
 func makeInputSource(unspents []*wire.TxOut) InputSource {
 	// Return outputs in order.
 	currentTotal := btcutil.Amount(0)
+	currentTotalToken := btcutil.Amount(0)
 	currentInputs := make([]*wire.TxIn, 0, len(unspents))
 	currentInputValues := make([]btcutil.Amount, 0, len(unspents))
-	f := func(target btcutil.Amount) (btcutil.Amount, []*wire.TxIn, []btcutil.Amount, [][]byte, error) {
+	f := func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (btcutil.Amount, btcutil.Amount, []*wire.TxIn, []btcutil.Amount, [][]byte, error) {
 		for currentTotal < target && len(unspents) != 0 {
 			u := unspents[0]
 			unspents = unspents[1:]
 			nextInput := wire.NewTxIn(&wire.OutPoint{}, nil, nil)
 			currentTotal += btcutil.Amount(u.Value)
+			if tokenId != nil && tokenId.IsValid() && tokenId.IsEqual(&u.TokenId) {
+				currentTotalToken += btcutil.Amount(u.TokenValue)
+			}
 			currentInputs = append(currentInputs, nextInput)
 			currentInputValues = append(currentInputValues, btcutil.Amount(u.Value))
 		}
-		return currentTotal, currentInputs, currentInputValues, make([][]byte, len(currentInputs)), nil
+		return currentTotal, currentTotalToken, currentInputs, currentInputValues, make([][]byte, len(currentInputs)), nil
 	}
 	return InputSource(f)
 }
