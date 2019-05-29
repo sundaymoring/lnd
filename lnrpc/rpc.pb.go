@@ -4655,6 +4655,17 @@ func (m *WalletBalanceRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_WalletBalanceRequest proto.InternalMessageInfo
 
+type TokenBalance struct {
+	TokenId			string `protobuf:"bytes,1,opt,name=token_id,proto3" json:"token_id,omitempty"`
+	TokenTotalBalance int64 `protobuf:"varint,2,opt,name=token_total_balance,proto3" json:"token_total_balance,omitempty"`
+	TokenConfirmedBalance int64 `protobuf:"varint,3,opt,name=token_confirmed_balance,proto3" json:"token_confirmed_balance,omitempty"`
+	TokenUnconfirmedBalance   int64    `protobuf:"varint,4,opt,name=token_unconfirmed_balance,proto3" json:"token_unconfirmed_balance,omitempty"`
+
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
 type WalletBalanceResponse struct {
 	// / The balance of the wallet
 	TotalBalance int64 `protobuf:"varint,1,opt,name=total_balance,proto3" json:"total_balance,omitempty"`
@@ -4662,6 +4673,10 @@ type WalletBalanceResponse struct {
 	ConfirmedBalance int64 `protobuf:"varint,2,opt,name=confirmed_balance,proto3" json:"confirmed_balance,omitempty"`
 	// / The unconfirmed balance of a wallet(with 0 confirmations)
 	UnconfirmedBalance   int64    `protobuf:"varint,3,opt,name=unconfirmed_balance,proto3" json:"unconfirmed_balance,omitempty"`
+
+	// for tokens
+	Tokens []*TokenBalance `protobuf:"bytes,4,rep,name=tokens,proto3" json:"tokens,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

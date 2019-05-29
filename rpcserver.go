@@ -2052,15 +2052,44 @@ func (r *rpcServer) WalletBalance(ctx context.Context,
 
 	rpcsLog.Debugf("[walletbalance] Total balance=%v", totalBal)
 
-	return &lnrpc.WalletBalanceResponse{
+	tokenTotalBal, err := r.server.cc.wallet.ConfirmedTokenBalance(0)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenConfirmedBal, err := r.server.cc.wallet.ConfirmedTokenBalance(1)
+	if err != nil {
+		return nil, err
+	}
+
+	var tokens []*lnrpc.TokenBalance
+	for k,v := range *tokenTotalBal {
+		token := lnrpc.TokenBalance {
+			TokenId: k.ToString(),
+			TokenTotalBalance: int64(v),
+		}
+		if v1, ok := (*tokenConfirmedBal)[k]; ok {
+			token.TokenConfirmedBalance = int64(v1)
+			token.TokenUnconfirmedBalance = int64(v - v1)
+		} else {
+			token.TokenUnconfirmedBalance = int64(v)
+		}
+		tokens = append(tokens, &token)
+	}
+
+	req := &lnrpc.WalletBalanceResponse{
 		TotalBalance:       int64(totalBal),
 		ConfirmedBalance:   int64(confirmedBal),
 		UnconfirmedBalance: int64(unconfirmedBal),
-	}, nil
+	}
+	req.Tokens = make([]*lnrpc.TokenBalance, len(tokens))
+	copy(req.Tokens[:], tokens[:])
+
+	return req, nil
 }
 
 // ChannelBalance returns the total available channel flow across all open
-// channels in satoshis.
+// channels in satoshis
 func (r *rpcServer) ChannelBalance(ctx context.Context,
 	in *lnrpc.ChannelBalanceRequest) (*lnrpc.ChannelBalanceResponse, error) {
 

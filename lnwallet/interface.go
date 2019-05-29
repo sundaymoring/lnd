@@ -144,6 +144,9 @@ type WalletController interface {
 	// witness inputs can be used for funding channels.
 	ConfirmedBalance(confs int32) (btcutil.Amount, error)
 
+	// for token
+	ConfirmedTokenBalance(confs int32) (*map[wire.TokenId]btcutil.Amount, error)
+
 	// NewAddress returns the next external or internal address for the
 	// wallet dictated by the value of the `change` parameter. If change is
 	// true, then an internal address should be used, otherwise an external
