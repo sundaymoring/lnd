@@ -2764,7 +2764,7 @@ func calculateFeeLimit(feeLimit *lnrpc.FeeLimit,
 // Lightning Network with a single persistent connection.
 func (r *rpcServer) SendPayment(stream lnrpc.Lightning_SendPaymentServer) error {
 	var lock sync.Mutex
-
+fmt.Printf("sendpayment rpc ============\n")
 	return r.sendPayment(&paymentStream{
 		recv: func() (*rpcPaymentRequest, error) {
 			req, err := stream.Recv()
@@ -4193,11 +4193,13 @@ func unmarshallRoute(rpcroute *lnrpc.Route,
 		prevNodePubKey = routeHop.PubKeyBytes
 	}
 
+	// TTODO use right tokenId
 	route, err := routing.NewRouteFromHops(
 		lnwire.MilliSatoshi(rpcroute.TotalAmtMsat),
 		rpcroute.TotalTimeLock,
 		sourceNode.PubKeyBytes,
 		hops,
+		wire.EmptyTokenId, lnwire.MilliSatoshi(rpcroute.TotalTokenMsat),
 	)
 	if err != nil {
 		return nil, err

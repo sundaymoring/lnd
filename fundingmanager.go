@@ -2137,6 +2137,9 @@ func (f *fundingManager) addToRouterGraph(completeChan *channeldb.OpenChannel,
 	// need to determine the smallest HTLC it deems economically relevant.
 	fwdMinHTLC := completeChan.LocalChanCfg.MinHTLC
 
+	// TTODO token min HTLC use selt num.
+	//fwdTokenMinHTLC := completeChan.LocalChanCfg.MinHTLC
+
 	// We'll obtain the max HTLC value we can forward in our direction, as
 	// we'll use this value within our ChannelUpdate. This value must be <=
 	// channel capacity and <= the maximum in-flight msats set by the peer.
@@ -2817,6 +2820,8 @@ func (f *fundingManager) handleInitFundingMsg(msg *initFundingMsg) {
 	if minHtlc == 0 {
 		minHtlc = f.cfg.DefaultRoutingPolicy.MinHTLC
 	}
+	// TTODO for token
+	//minTokenHtlc := f.cfg.DefaultRoutingPolicy.MinHTLC
 
 	// If a pending channel map for this peer isn't already created, then
 	// we create one, ultimately allowing us to track this pending

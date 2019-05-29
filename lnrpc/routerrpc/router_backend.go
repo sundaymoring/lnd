@@ -30,7 +30,7 @@ type RouterBackend struct {
 	// routes.
 	FindRoutes func(source, target routing.Vertex,
 		amt lnwire.MilliSatoshi, restrictions *routing.RestrictParams,
-		numPaths uint32, tokenId wire.TokenId, finalExpiry ...uint16) (
+		numPaths uint32, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId, finalExpiry ...uint16) (
 		[]*routing.Route, error)
 }
 
@@ -82,11 +82,6 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 		sourcePubKey = r.SelfNode
 	}
 
-	tokenId, err := wire.NewTokenIdFromStr(in.TokenId)
-	if err != nil {
-		return nil, err
-	}
-
 	// Currently, within the bootstrap phase of the network, we limit the
 	// largest payment size allotted to (2^32) - 1 mSAT or 4.29 million
 	// satoshis.
@@ -97,7 +92,20 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 			"allowed is %v", amt, r.MaxPaymentMSat.ToSatoshis())
 	}
 
+	tokenId, err := wire.NewTokenIdFromStr(in.TokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	amtToken := btcutil.Amount(in.AmtToken)
+	amtTokenMSat := lnwire.NewMSatFromSatoshis(amtToken)
+	if amtTokenMSat > r.MaxPaymentMSat {
+		return nil, fmt.Errorf("token payment of %v is too large, max payment "+
+			"allowed is %v", amt, r.MaxPaymentMSat.ToSatoshis())
+	}
+
 	// Unmarshall restrictions from request.
+	// HTODO token affect fee ?
 	feeLimit := calculateFeeLimit(in.FeeLimit, amtMSat)
 
 	ignoredNodes := make(map[routing.Vertex]struct{})
@@ -144,12 +152,12 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 	if in.FinalCltvDelta == 0 {
 		routes, findErr = r.FindRoutes(
 			sourcePubKey, targetPubKey, amtMSat, restrictions,
-			numRoutesIn, *tokenId,
+			numRoutesIn, amtTokenMSat, *tokenId,
 		)
 	} else {
 		routes, findErr = r.FindRoutes(
 			sourcePubKey, targetPubKey, amtMSat, restrictions,
-			numRoutesIn, *tokenId, uint16(in.FinalCltvDelta),
+			numRoutesIn, amtTokenMSat, *tokenId, uint16(in.FinalCltvDelta),
 		)
 	}
 	if findErr != nil {

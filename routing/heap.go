@@ -27,6 +27,7 @@ type nodeWithDist struct {
 
 	// for token
 	tokenId wire.TokenId
+	amountTokenToReceive lnwire.MilliSatoshi
 }
 
 // distanceHeap is a min-distance heap that's used within our path finding

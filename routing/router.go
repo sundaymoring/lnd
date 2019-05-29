@@ -207,11 +207,13 @@ type routeTuple struct {
 }
 
 // newRouteTuple creates a new route tuple from the target and amount.
-func newRouteTuple(amt lnwire.MilliSatoshi, dest []byte) routeTuple {
+// HTODO modify code where call this functionsss
+func newRouteTuple(amt lnwire.MilliSatoshi, dest []byte, token []byte) routeTuple {
 	r := routeTuple{
 		amt: amt,
 	}
 	copy(r.dest[:], dest)
+	copy(r.tokenId[:], token)
 
 	return r
 }
@@ -1088,6 +1090,9 @@ func (r *ChannelRouter) processUpdate(msg interface{}) error {
 		// after commitment fees are dynamic.
 		msg.Capacity = btcutil.Amount(chanUtxo.Value)
 		msg.ChannelPoint = *fundingPoint
+		// for token info
+		msg.TokenId = chanUtxo.TokenId
+		msg.CapacityToken = btcutil.Amount(chanUtxo.TokenValue)
 		if err := r.cfg.Graph.AddChannelEdge(msg); err != nil {
 			return errors.Errorf("unable to add edge: %v", err)
 		}
@@ -1095,9 +1100,9 @@ func (r *ChannelRouter) processUpdate(msg interface{}) error {
 		invalidateCache = true
 		log.Infof("New channel discovered! Link "+
 			"connects %x and %x with ChannelPoint(%v): "+
-			"chan_id=%v, capacity=%v",
+			"chan_id=%v, capacity=%v tokenid=%v, capacityToken=%v",
 			msg.NodeKey1Bytes, msg.NodeKey2Bytes,
-			fundingPoint, msg.ChannelID, msg.Capacity)
+			fundingPoint, msg.ChannelID, msg.Capacity, msg.TokenId, msg.CapacityToken)
 
 		// As a new edge has been added to the channel graph, we'll
 		// update the current UTXO filter within our active
@@ -1270,7 +1275,7 @@ type routingMsg struct {
 // total payment flow after fees are calculated.
 func pathsToFeeSortedRoutes(source Vertex, paths [][]*channeldb.ChannelEdgePolicy,
 	finalCLTVDelta uint16, amt lnwire.MilliSatoshi,
-	currentHeight uint32) ([]*Route, error) {
+	currentHeight uint32, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId) ([]*Route, error) {
 
 	validRoutes := make([]*Route, 0, len(paths))
 	for _, path := range paths {
@@ -1278,7 +1283,7 @@ func pathsToFeeSortedRoutes(source Vertex, paths [][]*channeldb.ChannelEdgePolic
 		// hop in the path as it contains a "self-hop" that is inserted
 		// by our KSP algorithm.
 		route, err := newRoute(
-			amt, source, path[1:], currentHeight, finalCLTVDelta,
+			amt, source, path[1:], currentHeight, finalCLTVDelta, tokenId, amtToken,
 		)
 		if err != nil {
 			// TODO(roasbeef): report straw breaking edge?
@@ -1327,7 +1332,7 @@ func pathsToFeeSortedRoutes(source Vertex, paths [][]*channeldb.ChannelEdgePolic
 // route that will be ranked the highest is the one with the lowest cumulative
 // fee along the route.
 func (r *ChannelRouter) FindRoutes(source, target Vertex,
-	amt lnwire.MilliSatoshi, restrictions *RestrictParams, numPaths uint32, tokenId wire.TokenId,
+	amt lnwire.MilliSatoshi, restrictions *RestrictParams, numPaths uint32, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId,
 	finalExpiry ...uint16) ([]*Route, error) {
 
 	var finalCLTVDelta uint16
@@ -1346,7 +1351,7 @@ func (r *ChannelRouter) FindRoutes(source, target Vertex,
 	// TODO: Route cache should store all request parameters instead of just
 	// amt and target. Currently false positives are returned if just the
 	// restrictions (fee limit, ignore lists) or finalExpiry are different.
-	rt := newRouteTuple(amt, target[:])
+	rt := newRouteTuple(amt, target[:], tokenId[:])
 	r.routeCacheMtx.RLock()
 	routes, ok := r.routeCache[rt]
 	r.routeCacheMtx.RUnlock()
@@ -1400,7 +1405,7 @@ func (r *ChannelRouter) FindRoutes(source, target Vertex,
 	// our source to the destination.
 	shortestPaths, err := findPaths(
 		tx, r.cfg.Graph, source, target, amt, restrictions,
-		numPaths, bandwidthHints,
+		numPaths, bandwidthHints, amtToken, tokenId,
 	)
 	if err != nil {
 		tx.Rollback()
@@ -1417,7 +1422,7 @@ func (r *ChannelRouter) FindRoutes(source, target Vertex,
 	sourceVertex := Vertex(r.selfNode.PubKeyBytes)
 	validRoutes, err := pathsToFeeSortedRoutes(
 		sourceVertex, shortestPaths, finalCLTVDelta, amt,
-		uint32(currentHeight),
+		uint32(currentHeight), amtToken, tokenId,
 	)
 	if err != nil {
 		return nil, err
@@ -1557,6 +1562,10 @@ type LightningPayment struct {
 	// OutgoingChannelID is the channel that needs to be taken to the first
 	// hop. If nil, any channel may be used.
 	OutgoingChannelID *uint64
+
+	// for token
+	TokenId wire.TokenId
+	TokenAmount lnwire.MilliSatoshi
 
 	// TODO(roasbeef): add e2e message?
 }

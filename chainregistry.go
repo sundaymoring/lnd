@@ -35,6 +35,7 @@ import (
 
 const (
 	defaultBitcoinMinHTLCMSat   = lnwire.MilliSatoshi(1000)
+	defaultBitcoinTokenMinHTLCMSat   = lnwire.MilliSatoshi(1000)	// for token
 	defaultBitcoinBaseFeeMSat   = lnwire.MilliSatoshi(1000)
 	defaultBitcoinFeeRate       = lnwire.MilliSatoshi(1)
 	defaultBitcoinTimeLockDelta = 144

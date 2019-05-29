@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"github.com/btcsuite/btcd/wire"
 	"testing"
 
 	"github.com/btcsuite/btcutil"
@@ -59,7 +60,7 @@ func TestQueryRoutes(t *testing.T) {
 
 	findRoutes := func(source, target routing.Vertex,
 		amt lnwire.MilliSatoshi, restrictions *routing.RestrictParams,
-		numPaths uint32, finalExpiry ...uint16) (
+		numPaths uint32, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId, finalExpiry ...uint16) (
 		[]*routing.Route, error) {
 
 		if int64(amt) != request.Amt*1000 {

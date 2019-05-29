@@ -2,6 +2,7 @@ package routing
 
 import (
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 	"time"
 
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -155,6 +156,8 @@ func (p *paymentSession) RequestRoute(payment *LightningPayment,
 		},
 		p.mc.selfNode.PubKeyBytes, payment.Target,
 		payment.Amount,
+		// TTODO token data should  params
+		lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		return nil, err
@@ -164,7 +167,7 @@ func (p *paymentSession) RequestRoute(payment *LightningPayment,
 	// a route by applying the time-lock and fee requirements.
 	sourceVertex := Vertex(p.mc.selfNode.PubKeyBytes)
 	route, err := newRoute(
-		payment.Amount, sourceVertex, path, height, finalCltvDelta,
+		payment.Amount, sourceVertex, path, height, finalCltvDelta, payment.TokenId, payment.TokenAmount,
 	)
 	if err != nil {
 		// TODO(roasbeef): return which edge/vertex didn't work

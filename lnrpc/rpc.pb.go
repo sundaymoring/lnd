@@ -4821,7 +4821,8 @@ type QueryRoutesRequest struct {
 	XXX_sizecache        int32    `json:"-"`
 
 	// for token
-	TokenId string	`protobuf:"bytes,9,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty`
+	AmtToken int64 `protobuf:"varint,9,opt,name=amtToken,proto3" json:"amtToken,omitempty"`
+	TokenId string	`protobuf:"bytes,10,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty`
 }
 
 func (m *QueryRoutesRequest) Reset()         { *m = QueryRoutesRequest{} }
@@ -5132,6 +5133,11 @@ type Route struct {
 	// *
 	// The total amount in millisatoshis.
 	TotalAmtMsat         int64    `protobuf:"varint,6,opt,name=total_amt_msat,proto3" json:"total_amt_msat,omitempty"`
+
+	// for token
+	TotalTokenMsat		 int64	  `protobuf:"varint,7,opt,name=total_token_amt_msat,proto3" json:"total_token_amt_msat,omitempty"`
+	TokenId				 string	  `protobuf:"bytes,8,opt,name=token_id,proto3" json:"token_id,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
