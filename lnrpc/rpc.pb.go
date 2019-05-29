@@ -542,12 +542,15 @@ type Utxo struct {
 	Address string `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
 	// / The value of the unspent coin in satoshis
 	AmountSat int64 `protobuf:"varint,3,opt,name=amount_sat,proto3" json:"amount_sat,omitempty"`
+	// for token
+	TokenAmountSat int64 `protobuf:"varint,4,opt,name=token_amount_sat,proto3" json:"token_amount_sat,omitempty"`
+	TokenId  string `protobuf:"bytes,5,opt,name=token_id,proto3" json:"token_id,omitempty"`
 	// / The pkscript in hex
-	PkScript string `protobuf:"bytes,4,opt,name=pk_script,proto3" json:"pk_script,omitempty"`
+	PkScript string `protobuf:"bytes,6,opt,name=pk_script,proto3" json:"pk_script,omitempty"`
 	// / The outpoint in format txid:n
-	Outpoint *OutPoint `protobuf:"bytes,5,opt,name=outpoint,proto3" json:"outpoint,omitempty"`
+	Outpoint *OutPoint `protobuf:"bytes,7,opt,name=outpoint,proto3" json:"outpoint,omitempty"`
 	// / The number of confirmations for the Utxo
-	Confirmations        int64    `protobuf:"varint,6,opt,name=confirmations,proto3" json:"confirmations,omitempty"`
+	Confirmations        int64    `protobuf:"varint,8,opt,name=confirmations,proto3" json:"confirmations,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
