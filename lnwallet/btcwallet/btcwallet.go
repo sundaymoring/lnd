@@ -230,6 +230,21 @@ func (b *BtcWallet) ConfirmedBalance(confs int32) (btcutil.Amount, error) {
 	return balance, nil
 }
 
+func (b *BtcWallet) ConfirmedTokenBalance(confs int32) (*map[wire.TokenId]btcutil.Amount, error) {
+	var tokenBalance map[wire.TokenId]btcutil.Amount = make(map[wire.TokenId]btcutil.Amount)
+
+	witnessOutputs, err := b.ListUnspentWitness(confs, math.MaxInt32)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, witnessOutput := range witnessOutputs {
+		tokenBalance[witnessOutput.TokenId] += witnessOutput.TokenValue
+	}
+
+	return &tokenBalance, nil
+}
+
 // NewAddress returns the next external or internal address for the wallet
 // dictated by the value of the `change` parameter. If change is true, then an
 // internal address will be returned, otherwise an external address should be

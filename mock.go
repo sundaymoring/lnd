@@ -228,6 +228,10 @@ func (*mockWalletController) ConfirmedBalance(confs int32) (btcutil.Amount, erro
 	return 0, nil
 }
 
+func (*mockWalletController) ConfirmedTokenBalance(confs int32) (*map[wire.TokenId]btcutil.Amount, error) {
+	return nil, nil
+}
+
 // NewAddress is called to get new addresses for delivery, change etc.
 func (m *mockWalletController) NewAddress(addrType lnwallet.AddressType,
 	change bool) (btcutil.Address, error) {
