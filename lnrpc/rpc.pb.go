@@ -624,18 +624,21 @@ type Transaction struct {
 	TxHash string `protobuf:"bytes,1,opt,name=tx_hash,proto3" json:"tx_hash,omitempty"`
 	// / The transaction amount, denominated in satoshis
 	Amount int64 `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+
+	TokenAmount int64 `protobuf:"varint,3,opt,name=token_amount,proto3" json:"token_amount,omitempty"`
+	TokenId 	string `protobuf:"bytes,4,opt,name=token_id,proto3" json:"token_id,omitempty"`
 	// / The number of confirmations
-	NumConfirmations int32 `protobuf:"varint,3,opt,name=num_confirmations,proto3" json:"num_confirmations,omitempty"`
+	NumConfirmations int32 `protobuf:"varint,5,opt,name=num_confirmations,proto3" json:"num_confirmations,omitempty"`
 	// / The hash of the block this transaction was included in
-	BlockHash string `protobuf:"bytes,4,opt,name=block_hash,proto3" json:"block_hash,omitempty"`
+	BlockHash string `protobuf:"bytes,6,opt,name=block_hash,proto3" json:"block_hash,omitempty"`
 	// / The height of the block this transaction was included in
-	BlockHeight int32 `protobuf:"varint,5,opt,name=block_height,proto3" json:"block_height,omitempty"`
+	BlockHeight int32 `protobuf:"varint,7,opt,name=block_height,proto3" json:"block_height,omitempty"`
 	// / Timestamp of this transaction
-	TimeStamp int64 `protobuf:"varint,6,opt,name=time_stamp,proto3" json:"time_stamp,omitempty"`
+	TimeStamp int64 `protobuf:"varint,8,opt,name=time_stamp,proto3" json:"time_stamp,omitempty"`
 	// / Fees paid for this transaction
-	TotalFees int64 `protobuf:"varint,7,opt,name=total_fees,proto3" json:"total_fees,omitempty"`
+	TotalFees int64 `protobuf:"varint,9,opt,name=total_fees,proto3" json:"total_fees,omitempty"`
 	// / Addresses that received funds for this transaction
-	DestAddresses        []string `protobuf:"bytes,8,rep,name=dest_addresses,proto3" json:"dest_addresses,omitempty"`
+	DestAddresses        []string `protobuf:"bytes,10,rep,name=dest_addresses,proto3" json:"dest_addresses,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

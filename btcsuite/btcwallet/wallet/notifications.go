@@ -123,6 +123,8 @@ func makeTxSummary(dbtx walletdb.ReadTx, w *Wallet, details *wtxmgr.TxDetails) T
 				Index:           d.Index,
 				PreviousAccount: lookupInputAccount(dbtx, w, details, d),
 				PreviousAmount:  d.Amount,
+				PreviousTokenAmount: d.TokenAmount,
+				PreviousTokenId: d.TokenId,
 			}
 		}
 	}
@@ -375,6 +377,8 @@ type TransactionSummaryInput struct {
 	Index           uint32
 	PreviousAccount uint32
 	PreviousAmount  btcutil.Amount
+	PreviousTokenAmount  btcutil.Amount
+	PreviousTokenId		 *wire.TokenId
 }
 
 // TransactionSummaryOutput describes wallet properties of a transaction output

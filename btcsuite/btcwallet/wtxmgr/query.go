@@ -7,6 +7,7 @@ package wtxmgr
 
 import (
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
@@ -21,6 +22,10 @@ type CreditRecord struct {
 	Index  uint32
 	Spent  bool
 	Change bool
+
+	// for token
+	TokenAmount btcutil.Amount
+	TokenId *wire.TokenId
 }
 
 // DebitRecord contains metadata regarding a transaction debit for a known
@@ -29,6 +34,10 @@ type CreditRecord struct {
 type DebitRecord struct {
 	Amount btcutil.Amount
 	Index  uint32
+
+	// for token
+	TokenAmount btcutil.Amount
+	TokenId *wire.TokenId
 }
 
 // TxDetails is intended to provide callers with access to rich details

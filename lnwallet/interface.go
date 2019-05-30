@@ -74,6 +74,10 @@ type TransactionDetail struct {
 	// transaction credits the wallet, then this value will be positive.
 	Value btcutil.Amount
 
+	// for token
+	TokenValue btcutil.Amount
+	TokenId    *wire.TokenId
+
 	// NumConfirmations is the number of confirmations this transaction
 	// has. If the transaction is unconfirmed, then this value will be
 	// zero.

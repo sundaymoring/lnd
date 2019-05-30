@@ -3865,6 +3865,8 @@ func (r *rpcServer) GetTransactions(ctx context.Context,
 		txDetails.Transactions[i] = &lnrpc.Transaction{
 			TxHash:           tx.Hash.String(),
 			Amount:           int64(tx.Value),
+			TokenAmount: 	  int64(tx.TokenValue),
+			TokenId: 		  tx.TokenId.ToString(),
 			NumConfirmations: tx.NumConfirmations,
 			BlockHash:        blockHash,
 			BlockHeight:      tx.BlockHeight,
