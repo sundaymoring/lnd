@@ -649,14 +649,14 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 		ourChanCfg, theirChanCfg)
 	remoteCommitmentKeys := deriveCommitmentKeys(remoteCommitPoint, false,
 		ourChanCfg, theirChanCfg)
-fmt.Printf("TokenId-01： %v\n", tokenId)
+
 	ourCommitTx, err := CreateCommitTx(fundingTxIn, localCommitmentKeys,
 		uint32(ourChanCfg.CsvDelay), localBalance, remoteBalance,
 		ourChanCfg.DustLimit, tokenId, localTokenBalance, remoteTokenBalance)
 	if err != nil {
 		return nil, nil, err
 	}
-fmt.Printf("TokenId-02： %v\n", tokenId)
+
 	otxn := btcutil.NewTx(ourCommitTx)
 	if err := blockchain.CheckTransactionSanity(otxn); err != nil {
 		return nil, nil, err
@@ -668,7 +668,6 @@ fmt.Printf("TokenId-02： %v\n", tokenId)
 	if err != nil {
 		return nil, nil, err
 	}
-fmt.Printf("TokenId-03： %v\n", tokenId)
 
 	ttxn := btcutil.NewTx(theirCommitTx)
 	if err := blockchain.CheckTransactionSanity(ttxn); err != nil {
@@ -1365,6 +1364,7 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	// Record any change output(s) generated as a result of the coin
 	// selection, but only if the addition of the output won't lead to the
 	// creation of dust.
+	contribution.ChangeOutputs = []*wire.TxOut{}
 	if changeTokenAmt != 0 {
 		changeAddr, err := l.NewAddress(WitnessPubKey, true)
 		if err != nil {
@@ -1375,13 +1375,12 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 			return err
 		}
 
-		contribution.ChangeOutputs = make([]*wire.TxOut, 1)
-		contribution.ChangeOutputs[0] = &wire.TxOut{
+		contribution.ChangeOutputs = append(contribution.ChangeOutputs, &wire.TxOut{
 			Value:    int64(DefaultBtcValueInTokenTx),
 			TokenValue: int64(changeTokenAmt),
 			TokenId: *tokenId,
 			PkScript: changeScript,
-		}
+		})
 		changeAmt -= DefaultBtcValueInTokenTx
 	}
 	if changeAmt != 0 && changeAmt > DefaultDustLimit() {
@@ -1394,13 +1393,12 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 			return err
 		}
 
-		contribution.ChangeOutputs = make([]*wire.TxOut, 1)
-		contribution.ChangeOutputs[0] = &wire.TxOut{
+		contribution.ChangeOutputs = append(contribution.ChangeOutputs, &wire.TxOut{
 			Value:    int64(changeAmt),
 			TokenValue: int64(0),
 			TokenId: wire.BtcTokenId,
 			PkScript: changeScript,
-		}
+		})
 	}
 
 	return nil

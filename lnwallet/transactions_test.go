@@ -1066,7 +1066,7 @@ func TestCommitmentSpendValidation(t *testing.T) {
 		NoDelayKey:    bobPayKey,
 	}
 	commitmentTx, err := CreateCommitTx(*fakeFundingTxIn, keyRing, csvTimeout,
-		channelBalance, channelBalance, DefaultDustLimit(), nil, 0, true)
+		channelBalance, channelBalance, DefaultDustLimit(), nil, 0, 0)
 	if err != nil {
 		t.Fatalf("unable to create commitment transaction: %v", nil)
 	}
@@ -1118,7 +1118,7 @@ func TestCommitmentSpendValidation(t *testing.T) {
 	sweepTx.TxIn[0].Witness = aliceWitnessSpend
 	vm, err := txscript.NewEngine(delayOutput.PkScript,
 		sweepTx, 0, txscript.StandardVerifyFlags, nil,
-		nil, int64(channelBalance))
+		nil, int64(channelBalance), nil, 0)
 	if err != nil {
 		t.Fatalf("unable to create engine: %v", err)
 	}
@@ -1152,7 +1152,7 @@ func TestCommitmentSpendValidation(t *testing.T) {
 	sweepTx.TxIn[0].Witness = bobWitnessSpend
 	vm, err = txscript.NewEngine(delayOutput.PkScript,
 		sweepTx, 0, txscript.StandardVerifyFlags, nil,
-		nil, int64(channelBalance))
+		nil, int64(channelBalance), nil, 0)
 	if err != nil {
 		t.Fatalf("unable to create engine: %v", err)
 	}
@@ -1198,7 +1198,7 @@ func TestCommitmentSpendValidation(t *testing.T) {
 	sweepTx.TxIn[0].Witness = bobRegularSpend
 	vm, err = txscript.NewEngine(regularOutput.PkScript,
 		sweepTx, 0, txscript.StandardVerifyFlags, nil,
-		nil, int64(channelBalance))
+		nil, int64(channelBalance), nil, 0)
 	if err != nil {
 		t.Fatalf("unable to create engine: %v", err)
 	}
