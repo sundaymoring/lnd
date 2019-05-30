@@ -4669,6 +4669,59 @@ type TokenBalance struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
+
+func (m *TokenBalance) Reset()         { *m = TokenBalance{} }
+func (m *TokenBalance) String() string { return proto.CompactTextString(m) }
+func (*TokenBalance) ProtoMessage()    {}
+func (*TokenBalance) Descriptor() ([]byte, []int) {
+	return fileDescriptor_rpc_3ef4d8a7aac1a994, []int{115}
+}
+func (m *TokenBalance) XXX_Unmarshal(b []byte) error {
+	return xxx_messageTokenBalance.Unmarshal(m, b)
+}
+func (m *TokenBalance) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageTokenBalance.Marshal(b, m, deterministic)
+}
+func (dst *TokenBalance) XXX_Merge(src proto.Message) {
+	xxx_messageTokenBalance.Merge(dst, src)
+}
+func (m *TokenBalance) XXX_Size() int {
+	return xxx_messageTokenBalance.Size(m)
+}
+func (m *TokenBalance) XXX_DiscardUnknown() {
+	xxx_messageTokenBalance.DiscardUnknown(m)
+}
+
+var xxx_messageTokenBalance proto.InternalMessageInfo
+
+func (m *TokenBalance) GetTokenId() string {
+	if m != nil {
+		return m.TokenId
+	}
+	return ""
+}
+
+func (m *TokenBalance) GetTokenTotalBalance() int64 {
+	if m != nil {
+		return m.TokenTotalBalance
+	}
+	return 0
+}
+
+func (m *TokenBalance) GetTokenConfirmedBalance() int64 {
+	if m != nil {
+		return m.TokenConfirmedBalance
+	}
+	return 0
+}
+
+func (m *TokenBalance) GetTokenUnconfirmedBalance() int64 {
+	if m != nil {
+		return m.TokenUnconfirmedBalance
+	}
+	return 0
+}
+
 type WalletBalanceResponse struct {
 	// / The balance of the wallet
 	TotalBalance int64 `protobuf:"varint,1,opt,name=total_balance,proto3" json:"total_balance,omitempty"`
@@ -8098,6 +8151,7 @@ func init() {
 	proto.RegisterType((*ChannelEventSubscription)(nil), "lnrpc.ChannelEventSubscription")
 	proto.RegisterType((*ChannelEventUpdate)(nil), "lnrpc.ChannelEventUpdate")
 	proto.RegisterType((*WalletBalanceRequest)(nil), "lnrpc.WalletBalanceRequest")
+	proto.RegisterType((*TokenBalance)(nil), "lnrpc.TokenBalance")
 	proto.RegisterType((*WalletBalanceResponse)(nil), "lnrpc.WalletBalanceResponse")
 	proto.RegisterType((*ChannelBalanceRequest)(nil), "lnrpc.ChannelBalanceRequest")
 	proto.RegisterType((*ChannelBalanceResponse)(nil), "lnrpc.ChannelBalanceResponse")
