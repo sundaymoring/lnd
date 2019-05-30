@@ -2001,7 +2001,7 @@ func TestFindPathFeeWeighting(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, amt,
+		sourceNode.PubKeyBytes, target, amt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)

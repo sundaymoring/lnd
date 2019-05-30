@@ -610,7 +610,7 @@ func TestFindLowestFeePath(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, paymentAmt,
+		sourceNode.PubKeyBytes, target, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -750,7 +750,7 @@ func testBasicGraphPathFindingCase(t *testing.T, graphInstance *testGraphInstanc
 		&RestrictParams{
 			FeeLimit: test.feeLimit,
 		},
-		sourceNode.PubKeyBytes, target, paymentAmt,
+		sourceNode.PubKeyBytes, target, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if test.expectFailureNoPath {
 		if err == nil {
@@ -916,7 +916,7 @@ func TestPathFindingWithAdditionalEdges(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, doge.PubKeyBytes, paymentAmt,
+		sourceNode.PubKeyBytes, doge.PubKeyBytes, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find private path to doge: %v", err)
@@ -1229,7 +1229,7 @@ func TestNewRoutePathTooLong(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, paymentAmt,
+		sourceNode.PubKeyBytes, target, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("path should have been found")
@@ -1245,7 +1245,7 @@ func TestNewRoutePathTooLong(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, paymentAmt,
+		sourceNode.PubKeyBytes, target, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err == nil {
 		t.Fatalf("should not have been able to find path, supposed to be "+
@@ -1287,7 +1287,7 @@ func TestPathNotAvailable(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, unknownNode, 100,
+		sourceNode.PubKeyBytes, unknownNode, 100, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("path shouldn't have been found: %v", err)
@@ -1326,7 +1326,7 @@ func TestPathInsufficientCapacity(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("graph shouldn't be able to support payment: %v", err)
@@ -1361,7 +1361,7 @@ func TestRouteFailMinHTLC(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("graph shouldn't be able to support payment: %v", err)
@@ -1421,7 +1421,7 @@ func TestRouteFailMaxHTLC(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("graph should've been able to support payment: %v", err)
@@ -1445,7 +1445,7 @@ func TestRouteFailMaxHTLC(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("graph shouldn't be able to support payment: %v", err)
@@ -1482,7 +1482,7 @@ func TestRouteFailDisabledEdge(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -1512,7 +1512,7 @@ func TestRouteFailDisabledEdge(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -1539,7 +1539,7 @@ func TestRouteFailDisabledEdge(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("graph shouldn't be able to support payment: %v", err)
@@ -1575,7 +1575,7 @@ func TestPathSourceEdgesBandwidth(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -1601,7 +1601,7 @@ func TestPathSourceEdgesBandwidth(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if !IsError(err, ErrNoPathFound) {
 		t.Fatalf("graph shouldn't be able to support payment: %v", err)
@@ -1621,7 +1621,7 @@ func TestPathSourceEdgesBandwidth(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -1654,7 +1654,7 @@ func TestPathSourceEdgesBandwidth(t *testing.T) {
 		&RestrictParams{
 			FeeLimit: noFeeLimit,
 		},
-		sourceNode.PubKeyBytes, target, payAmt,
+		sourceNode.PubKeyBytes, target, payAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)
@@ -1928,7 +1928,7 @@ func TestNewRouteFromEmptyHops(t *testing.T) {
 	t.Parallel()
 
 	var source Vertex
-	_, err := NewRouteFromHops(0, 0, source, []*Hop{})
+	_, err := NewRouteFromHops(0, 0, source, []*Hop{}, wire.EmptyTokenId, 0)
 	if err != ErrNoRouteHopsProvided {
 		t.Fatalf("expected empty hops error: instead got: %v", err)
 	}
@@ -2000,7 +2000,7 @@ func TestRestrictOutgoingChannel(t *testing.T) {
 			FeeLimit:          noFeeLimit,
 			OutgoingChannelID: &outgoingChannelID,
 		},
-		sourceVertex, target, paymentAmt,
+		sourceVertex, target, paymentAmt, lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
 	)
 	if err != nil {
 		t.Fatalf("unable to find path: %v", err)

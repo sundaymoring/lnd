@@ -2097,6 +2097,10 @@ type ChannelEdgeInfo struct {
 	// the value output in the outpoint that created this channel.
 	Capacity btcutil.Amount
 
+	// for token
+	TokenId wire.TokenId
+	CapacityToken btcutil.Amount
+
 	// ExtraOpaqueData is the set of data that was appended to this
 	// message, some of which we may not actually know how to iterate or
 	// parse. By holding onto this data, we ensure that we're able to
@@ -2466,6 +2470,11 @@ type ChannelEdgePolicy struct {
 	ExtraOpaqueData []byte
 
 	db *DB
+
+	// for token
+	TokenId wire.TokenId
+	TokenMinHTLC lnwire.MilliSatoshi
+	//TokenMaxHTLC lnwire.MilliSatoshi	// do not consider tokenMaxHtlc
 }
 
 // Signature is a channel announcement signature, which is needed for proper
@@ -3079,6 +3088,14 @@ func putChanEdgeInfo(edgeIndex *bbolt.Bucket, edgeInfo *ChannelEdgeInfo, chanID 
 		return err
 	}
 
+	// write token info
+	if _, err := b.Write(edgeInfo.TokenId[:]); err != nil {
+		return err
+	}
+	if err := binary.Write(&b, byteOrder, uint64(edgeInfo.CapacityToken)); err != nil {
+		return err
+	}
+
 	return edgeIndex.Put(chanID[:], b.Bytes())
 }
 
@@ -3161,6 +3178,15 @@ func deserializeChanEdgeInfo(r io.Reader) (ChannelEdgeInfo, error) {
 	edgeInfo.ExtraOpaqueData, err = wire.ReadVarBytes(
 		r, 0, MaxAllowedExtraOpaqueBytes, "blob",
 	)
+
+	// read token info
+	if _, err := io.ReadFull(r, edgeInfo.TokenId[:]); err != nil {
+		return ChannelEdgeInfo{}, err
+	}
+	if err := binary.Read(r, byteOrder, &edgeInfo.CapacityToken); err != nil {
+		return ChannelEdgeInfo{}, err
+	}
+
 	switch {
 	case err == io.ErrUnexpectedEOF:
 	case err == io.EOF:
@@ -3369,6 +3395,14 @@ func serializeChanEdgePolicy(w io.Writer, edge *ChannelEdgePolicy,
 		return err
 	}
 
+	// write token info
+	if _, err := w.Write(edge.TokenId[:]); err != nil {
+		return err
+	}
+	if err := binary.Write(w, byteOrder, uint64(edge.TokenMinHTLC)); err != nil {
+		return err
+	}
+
 	// If the max_htlc field is present, we write it. To be compatible with
 	// older versions that wasn't aware of this field, we write it as part
 	// of the opaque data.
@@ -3391,6 +3425,8 @@ func serializeChanEdgePolicy(w io.Writer, edge *ChannelEdgePolicy,
 	if err := wire.WriteVarBytes(w, 0, opaqueBuf.Bytes()); err != nil {
 		return err
 	}
+
+
 	return nil
 }
 
@@ -3453,6 +3489,15 @@ func deserializeChanEdgePolicy(r io.Reader,
 			pub[:], err)
 	}
 	edge.Node = &node
+
+	// read token info
+	if _, err := r.Read(edge.TokenId[:]); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(r, byteOrder, &n); err != nil {
+		return nil, err
+	}
+	edge.TokenMinHTLC = lnwire.MilliSatoshi(n)
 
 	// We'll try and see if there are any opaque bytes left, if not, then
 	// we'll ignore the EOF error and return the edge as is.

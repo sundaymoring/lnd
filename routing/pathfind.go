@@ -3,6 +3,7 @@ package routing
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 	"math"
 
 	"container/heap"
@@ -84,6 +85,10 @@ type Hop struct {
 	// hop. This value is less than the value that the incoming HTLC
 	// carries as a fee will be subtracted by the hop.
 	AmtToForward lnwire.MilliSatoshi
+
+	// for token
+	TokenId wire.TokenId
+	TokenAmtToForward lnwire.MilliSatoshi
 }
 
 // edgePolicyWithSource is a helper struct to keep track of the source node
@@ -153,6 +158,10 @@ type Route struct {
 	// Hops contains details concerning the specific forwarding details at
 	// each hop.
 	Hops []*Hop
+
+	// for token
+	TokenId	wire.TokenId
+	TotalTokenAmount lnwire.MilliSatoshi
 }
 
 // HopFee returns the fee charged by the route hop indicated by hopIndex.
@@ -211,7 +220,7 @@ func (r *Route) ToHopPayloads() []sphinx.HopData {
 // the source to the target node of the path finding attempt.
 func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 	pathEdges []*channeldb.ChannelEdgePolicy, currentHeight uint32,
-	finalCLTVDelta uint16) (*Route, error) {
+	finalCLTVDelta uint16, tokenId wire.TokenId, tokenAmtToSend lnwire.MilliSatoshi) (*Route, error) {
 
 	var (
 		hops []*Hop
@@ -226,6 +235,7 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 		// backwards below, this next hop gets closer and closer to the
 		// sender of the payment.
 		nextIncomingAmount lnwire.MilliSatoshi
+		nextIncomingTokenAmount lnwire.MilliSatoshi
 	)
 
 	pathLength := len(pathEdges)
@@ -239,6 +249,8 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 		// Protocol / "Payload for the Last Node", this is detailed.
 		amtToForward := amtToSend
 
+		tokenAmtToForward := tokenAmtToSend
+
 		// Fee is not part of the hop payload, but only used for
 		// reporting through RPC. Set to zero for the final hop.
 		fee := lnwire.MilliSatoshi(0)
@@ -249,6 +261,7 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 			// The amount that the current hop needs to forward is
 			// equal to the incoming amount of the next hop.
 			amtToForward = nextIncomingAmount
+			tokenAmtToForward = nextIncomingTokenAmount
 
 			// The fee that needs to be paid to the current hop is
 			// based on the amount that this hop needs to forward
@@ -292,6 +305,8 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 			ChannelID:        edge.ChannelID,
 			AmtToForward:     amtToForward,
 			OutgoingTimeLock: outgoingTimeLock,
+			TokenId:		  tokenId,
+			TokenAmtToForward:tokenAmtToForward,
 		}
 		hops = append([]*Hop{currentHop}, hops...)
 
@@ -299,11 +314,12 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 		// *next* hop, which is the amount this hop needs to forward,
 		// accounting for the fee that it takes.
 		nextIncomingAmount = amtToForward + fee
+		nextIncomingTokenAmount = tokenAmtToForward
 	}
 
 	// With the base routing data expressed as hops, build the full route
 	newRoute, err := NewRouteFromHops(
-		nextIncomingAmount, totalTimeLock, sourceVertex, hops,
+		nextIncomingAmount, totalTimeLock, sourceVertex, hops, tokenId, nextIncomingTokenAmount,
 	)
 	if err != nil {
 		return nil, err
@@ -316,7 +332,7 @@ func newRoute(amtToSend lnwire.MilliSatoshi, sourceVertex Vertex,
 // information to perform the payment. It infers fee amounts and populates the
 // node, chan and prev/next hop maps.
 func NewRouteFromHops(amtToSend lnwire.MilliSatoshi, timeLock uint32,
-	sourceVertex Vertex, hops []*Hop) (*Route, error) {
+	sourceVertex Vertex, hops []*Hop, tokenId wire.TokenId, tokenAmtToSend lnwire.MilliSatoshi) (*Route, error) {
 
 	if len(hops) == 0 {
 		return nil, ErrNoRouteHopsProvided
@@ -333,6 +349,8 @@ func NewRouteFromHops(amtToSend lnwire.MilliSatoshi, timeLock uint32,
 		TotalTimeLock: timeLock,
 		TotalAmount:   amtToSend,
 		TotalFees:     amtToSend - hops[len(hops)-1].AmtToForward,
+		TokenId:	   tokenId,
+		TotalTokenAmount:tokenAmtToSend,
 	}
 
 	return route, nil
@@ -429,7 +447,7 @@ type RestrictParams struct {
 // that need to be paid along the path and accurately check the amount
 // to forward at every node against the available bandwidth.
 func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
-	amt lnwire.MilliSatoshi/*, tokenId wire.TokenId, tokenMaxFee btcutil.Amount*/) ([]*channeldb.ChannelEdgePolicy, error) {
+	amt lnwire.MilliSatoshi,/*tokenMaxFee btcutil.Amount,*/ amtToken lnwire.MilliSatoshi, tokenId *wire.TokenId) ([]*channeldb.ChannelEdgePolicy, error) {
 
 	var err error
 	tx := g.tx
@@ -501,7 +519,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		node:            targetNode,
 		amountToReceive: amt,
 		fee:             0,
-		/*tokenId: 		 tokenId,*/
+		tokenId: 		 *tokenId,
+		amountTokenToReceive:amtToken,
 	}
 
 	// We'll use this map as a series of "next" hop pointers. So to get
@@ -522,7 +541,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 	// satisfy our specific requirements.
 	processEdge := func(fromNode *channeldb.LightningNode,
 		edge *channeldb.ChannelEdgePolicy,
-		bandwidth lnwire.MilliSatoshi, /*tokenId wire.TokenId,*/ toNode Vertex) {
+		bandwidth lnwire.MilliSatoshi, tokenBandwidth lnwire.MilliSatoshi,/*tokenId wire.TokenId,*/ toNode Vertex) {
 
 		fromVertex := Vertex(fromNode.PubKeyBytes)
 
@@ -569,6 +588,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		*/
 
 		amountToSend := toNodeDist.amountToReceive
+		amountTokenToSend := toNodeDist.amountTokenToReceive
+		tokenIdEdge := toNodeDist.tokenId
 
 		// If the estimated bandwidth of the channel edge is not able
 		// to carry the amount that needs to be send, return.
@@ -576,9 +597,16 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			return
 		}
 
+		// for token restraint
+		if tokenIdEdge != edge.TokenId || tokenBandwidth < amountTokenToSend {
+			log.Info("taiyi debug: tokenIdEdge != edge.TokenId || tokenBandwidth < amountTokenToSend")
+			return
+		}
+
 		// If the amountToSend is less than the minimum required
 		// amount, return.
-		if amountToSend < edge.MinHTLC {
+		if amountToSend < edge.MinHTLC || amountTokenToSend < edge.TokenMinHTLC {
+			log.Info("taiyi debug: amountToSend < edge.MinHTLC || amountTokenToSend < edge.TokenMinHTLC")
 			return
 		}
 
@@ -586,6 +614,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		// its max HTLC. Therefore, only consider discarding this edge here if
 		// the field is set.
 		if edge.MaxHTLC != 0 && edge.MaxHTLC < amountToSend {
+			// ||(edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend){
+			log.Info("taiyi debug: edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend")
 			return
 		}
 
@@ -612,6 +642,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		// pay the amount that this node forwards plus the fee it
 		// charges.
 		amountToReceive := amountToSend + fee
+		amountTokenToReceive := amountTokenToSend
 
 		// Check if accumulated fees would exceed fee limit when this
 		// node would be added to the path.
@@ -655,6 +686,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			dist:            tempDist,
 			node:            fromNode,
 			amountToReceive: amountToReceive,
+			amountTokenToReceive: amountTokenToReceive,
+			tokenId: 		 edge.TokenId,
 			fee:             fee,
 		}
 
@@ -701,6 +734,11 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 				return nil
 			}
 
+			if *tokenId != edgeInfo.TokenId {
+				log.Infof("taiyi debug: *tokenId != edgeInfo.TokenId")
+				return nil
+			}
+
 			// We'll query the lower layer to see if we can obtain
 			// any more up to date information concerning the
 			// bandwidth of this edge.
@@ -713,6 +751,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 					edgeInfo.Capacity,
 				)
 			}
+
+			edgeTokenBandwidth := lnwire.NewMSatFromSatoshis(edgeInfo.CapacityToken)
 
 			// Before we can process the edge, we'll need to fetch
 			// the node on the _other_ end of this channel as we
@@ -727,7 +767,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 
 			// Check if this candidate node is better than what we
 			// already have.
-			processEdge(channelSource, inEdge, edgeBandwidth, pivot)
+			processEdge(channelSource, inEdge, edgeBandwidth, edgeTokenBandwidth, pivot)
 			return nil
 		})
 		if err != nil {
@@ -740,9 +780,10 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		// routing hint due to having enough capacity for the payment
 		// and use the payment amount as its capacity.
 		bandWidth := partialPath.amountToReceive
+		tokenBandWidth := partialPath.amountTokenToReceive
 		for _, reverseEdge := range additionalEdgesWithSrc[bestNode.PubKeyBytes] {
 			processEdge(reverseEdge.sourceNode, reverseEdge.edge,
-				bandWidth, pivot)
+				bandWidth, tokenBandWidth, pivot)
 		}
 	}
 
@@ -795,7 +836,7 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 func findPaths(tx *bbolt.Tx, graph *channeldb.ChannelGraph,
 	source, target Vertex, amt lnwire.MilliSatoshi,
 	restrictions *RestrictParams, numPaths uint32,
-	bandwidthHints map[uint64]lnwire.MilliSatoshi) (
+	bandwidthHints map[uint64]lnwire.MilliSatoshi, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId) (
 	[][]*channeldb.ChannelEdgePolicy, error) {
 
 	// TODO(roasbeef): modifying ordering within heap to eliminate final
@@ -814,7 +855,7 @@ func findPaths(tx *bbolt.Tx, graph *channeldb.ChannelGraph,
 			graph:          graph,
 			bandwidthHints: bandwidthHints,
 		},
-		restrictions, source, target, amt,
+		restrictions, source, target, amt, amtToken, &tokenId,
 	)
 	if err != nil {
 		log.Errorf("Unable to find path: %v", err)
@@ -914,7 +955,7 @@ func findPaths(tx *bbolt.Tx, graph *channeldb.ChannelGraph,
 					bandwidthHints: bandwidthHints,
 				},
 				spurRestrictions, spurNode.PubKeyBytes,
-				target, amt,
+				target, amt, amtToken, &tokenId,
 			)
 
 			// If we weren't able to find a path, we'll continue to
