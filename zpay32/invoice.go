@@ -1069,7 +1069,7 @@ func writeTaggedFields(bufferBase32 *bytes.Buffer, invoice *Invoice) error {
 		}
 	}
 
-	if invoice.TokenId != nil {
+	if invoice.TokenId != nil && invoice.TokenId.IsValid() {
 		// Convert 36 byte hash to 58 5-bit groups.
 		descBase32, err := bech32.ConvertBits(
 			invoice.TokenId[:], 8, 5, true)

@@ -88,6 +88,10 @@ func WriteElement(w io.Writer, element interface{}) error {
 		if _, err := w.Write(e[:]); err != nil {
 			return err
 		}
+	case wire.TokenId:
+		if _, err := w.Write(e[:]); err != nil {
+			return err
+		}
 
 	case wire.OutPoint:
 		return writeOutpoint(w, &e)
@@ -242,7 +246,10 @@ func ReadElement(r io.Reader, element interface{}) error {
 		if _, err := io.ReadFull(r, e[:]); err != nil {
 			return err
 		}
-
+	case *wire.TokenId:
+		if _, err := io.ReadFull(r, e[:]); err != nil {
+			return err
+		}
 	case *wire.OutPoint:
 		return readOutpoint(r, e)
 

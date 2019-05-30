@@ -224,6 +224,10 @@ func WriteElement(w io.Writer, element interface{}) error {
 		if _, err := w.Write(e[:]); err != nil {
 			return err
 		}
+	case wire.TokenId:
+		if _, err := w.Write(e[:]); err != nil {
+			return err
+		}
 	case PkScript:
 		// The largest script we'll accept is a p2wsh which is exactly
 		// 34 bytes long.
@@ -606,6 +610,10 @@ func ReadElement(r io.Reader, element interface{}) error {
 			return err
 		}
 	case *[33]byte:
+		if _, err := io.ReadFull(r, e[:]); err != nil {
+			return err
+		}
+	case *wire.TokenId:
 		if _, err := io.ReadFull(r, e[:]); err != nil {
 			return err
 		}

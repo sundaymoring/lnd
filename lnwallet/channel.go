@@ -6558,9 +6558,11 @@ func AddTokenSendTxout(tx *wire.MsgTx, tokenId *wire.TokenId, totalTokenAmount i
 			return s
 		}
 
+		reverseTokenId := wire.TokenId{}
+		reverseTokenId.SetBytes(tokenId[:])
 		builder := txscript.NewScriptBuilder()
 		builder.AddOps(scriptHeader[:])
-		builder.AddData(reverse(tokenId[:]))
+		builder.AddData(reverse(reverseTokenId[:]))
 		builder.AddInt64(totalTokenAmount)
 
 		script, _ := builder.Script()

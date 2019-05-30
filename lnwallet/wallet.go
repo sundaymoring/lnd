@@ -649,14 +649,14 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 		ourChanCfg, theirChanCfg)
 	remoteCommitmentKeys := deriveCommitmentKeys(remoteCommitPoint, false,
 		ourChanCfg, theirChanCfg)
-
+fmt.Printf("TokenId-01： %v\n", tokenId)
 	ourCommitTx, err := CreateCommitTx(fundingTxIn, localCommitmentKeys,
 		uint32(ourChanCfg.CsvDelay), localBalance, remoteBalance,
 		ourChanCfg.DustLimit, tokenId, localTokenBalance, remoteTokenBalance)
 	if err != nil {
 		return nil, nil, err
 	}
-
+fmt.Printf("TokenId-02： %v\n", tokenId)
 	otxn := btcutil.NewTx(ourCommitTx)
 	if err := blockchain.CheckTransactionSanity(otxn); err != nil {
 		return nil, nil, err
@@ -668,11 +668,13 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 	if err != nil {
 		return nil, nil, err
 	}
+fmt.Printf("TokenId-03： %v\n", tokenId)
 
 	ttxn := btcutil.NewTx(theirCommitTx)
 	if err := blockchain.CheckTransactionSanity(ttxn); err != nil {
 		return nil, nil, err
 	}
+
 
 	return ourCommitTx, theirCommitTx, nil
 }
@@ -1451,10 +1453,15 @@ func selectInputs(amt btcutil.Amount, amtToken btcutil.Amount, tokenId *wire.Tok
 	satTokenSelected := btcutil.Amount(0)
 	for i, coin := range coins {
 		if *tokenId != coin.TokenId {
-			continue
+			if !coin.TokenId.IsValid() && satSelected < amt {
+				satSelected += coin.Value
+			}
+		}else {
+			satSelected += coin.Value
+			satTokenSelected += coin.TokenValue
 		}
-		satSelected += coin.Value
-		satTokenSelected += coin.TokenValue
+
+
 		if satSelected >= amt && satTokenSelected >= amtToken {
 			return satSelected, satTokenSelected, coins[:i+1], nil
 		}

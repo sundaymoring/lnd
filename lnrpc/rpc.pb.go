@@ -7341,6 +7341,7 @@ type PayReq struct {
 	FallbackAddr         string       `protobuf:"bytes,8,opt,name=fallback_addr,proto3" json:"fallback_addr,omitempty"`
 	CltvExpiry           int64        `protobuf:"varint,9,opt,name=cltv_expiry,proto3" json:"cltv_expiry,omitempty"`
 	RouteHints           []*RouteHint `protobuf:"bytes,10,rep,name=route_hints,proto3" json:"route_hints,omitempty"`
+	TokenId				 string		  `protobuf:"bytes,11,opt,name=token_id,proto3" json:"token_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_unrecognized     []byte       `json:"-"`
 	XXX_sizecache        int32        `json:"-"`

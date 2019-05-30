@@ -1373,6 +1373,9 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		fundingTime:	 uint32(time.Now().Unix()),
 	}
 
+	fmt.Printf("openChanReq: %+v\n", req)
+	fmt.Printf("openChanReq: %+v\n", req)
+
 	req.tokenId.SetBytes(tokenId[:])
 	updateChan, errChan := r.server.OpenChannel(req)
 
@@ -4575,6 +4578,10 @@ func (r *rpcServer) DecodePayReq(ctx context.Context,
 	if payReq.MilliSat != nil {
 		amt = int64(payReq.MilliSat.ToSatoshis())
 	}
+	tokenId := ""
+	if payReq.TokenId != nil && payReq.TokenId.IsValid() {
+		tokenId = payReq.TokenId.ToString()
+	}
 
 	dest := payReq.Destination.SerializeCompressed()
 	return &lnrpc.PayReq{
@@ -4588,6 +4595,7 @@ func (r *rpcServer) DecodePayReq(ctx context.Context,
 		Expiry:          expiry,
 		CltvExpiry:      int64(payReq.MinFinalCLTVExpiry()),
 		RouteHints:      routeHints,
+		TokenId:         tokenId,
 	}, nil
 }
 

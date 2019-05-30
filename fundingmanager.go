@@ -1117,7 +1117,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 	}
 
 	fndgLog.Infof("Requiring %v confirmations for pendingChan(%x): "+
-		"amt=%v, push_amt=%v, tokenAmt=%v, pushTokenAmt", numConfsReq, fmsg.msg.PendingChannelID,
+		"amt=%v, push_amt=%v, tokenAmt=%v, pushTokenAmt=%v", numConfsReq, fmsg.msg.PendingChannelID,
 		amt, msg.PushAmount, msg.FundingTokenAmount, msg.PushTokenAmount)
 
 	// Generate our required constraints for the remote party.

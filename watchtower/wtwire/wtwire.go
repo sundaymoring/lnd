@@ -68,7 +68,10 @@ func WriteElement(w io.Writer, element interface{}) error {
 		if _, err := w.Write(e[:]); err != nil {
 			return err
 		}
-
+	case wire.TokenId:
+		if _, err := w.Write(e[:]); err != nil {
+			return err
+		}
 	case []byte:
 		if err := wire.WriteVarBytes(w, 0, e); err != nil {
 			return err
@@ -193,6 +196,10 @@ func ReadElement(r io.Reader, element interface{}) error {
 			return err
 		}
 		*e = bytes
+	case *wire.TokenId:
+		if _, err := io.ReadFull(r, e[:]); err != nil {
+			return err
+		}
 
 	case *lnwallet.SatPerKWeight:
 		var b [8]byte

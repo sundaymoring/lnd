@@ -381,10 +381,12 @@ func (b *BtcWallet) ListUnspentWitness(minConfs, maxConfs int32) (
 				},
 				Confirmations: output.Confirmations,
 			}
-			if len(output.TokenId) != wire.TokenIdSize {
+			if len(output.TokenId) != wire.MaxTokenIdStringSize {
 				return nil, errors.New("token id length error")
 			}
-			copy(utxo.TokenId[:], []byte(output.TokenId))
+
+			tokenId, _ := wire.NewTokenIdFromStr(output.TokenId)
+			utxo.TokenId.SetBytes(tokenId[:])
 			witnessOutputs = append(witnessOutputs, utxo)
 		}
 
@@ -790,10 +792,17 @@ func (b *BtcWallet) IsSynced() (bool, int64, error) {
 
 // HTODO implement function
 func (b *BtcWallet)GetTokenId(symbol string) (*wire.TokenId, error){
-	return nil,nil
+	if tokenId, err := b.chain.GetTokenId(symbol); err != nil {
+		return nil, err
+	}else {
+		return &tokenId, nil
+	}
 }
 
 func (b *BtcWallet)GetTokenSymbol(tokenId *wire.TokenId) (string, error){
-	return "", nil
+	if symbol, err := b.chain.GetTokenSymbol(*tokenId); err != nil {
+		return "", err
+	}else {
+		return symbol, nil
+	}
 }
-
