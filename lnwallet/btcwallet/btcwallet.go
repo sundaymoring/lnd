@@ -381,7 +381,7 @@ func (b *BtcWallet) ListUnspentWitness(minConfs, maxConfs int32) (
 				},
 				Confirmations: output.Confirmations,
 			}
-			if len(output.TokenId) != wire.TokenIdSize {
+			if len(output.TokenId) != wire.MaxTokenIdStringSize {
 				return nil, errors.New("token id length error")
 			}
 			copy(utxo.TokenId[:], []byte(output.TokenId))
