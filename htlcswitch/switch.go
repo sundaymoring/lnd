@@ -69,7 +69,7 @@ var (
 type pendingPayment struct {
 	paymentHash lnwallet.PaymentHash
 	amount      lnwire.MilliSatoshi
-
+	tokenAmount      lnwire.MilliSatoshi
 	preimage chan [sha256.Size]byte
 	err      chan error
 
@@ -373,6 +373,7 @@ func (s *Switch) SendHTLC(firstHop lnwire.ShortChannelID,
 		preimage:     make(chan [sha256.Size]byte, 1),
 		paymentHash:  htlc.PaymentHash,
 		amount:       htlc.Amount,
+		tokenAmount:  htlc.TokenAmount,
 		deobfuscator: deobfuscator,
 	}
 
@@ -1071,6 +1072,7 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 				htlc.PaymentHash, packet.incomingAmount,
 				packet.amount, packet.incomingTimeout,
 				packet.outgoingTimeout, currentHeight,
+				packet.incomingTokenAmount, packet.tokenAmount,
 			)
 			if err != nil {
 				linkErrs[link.ShortChanID()] = err
@@ -1197,7 +1199,9 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 						IncomingChanID: circuit.Incoming.ChanID,
 						OutgoingChanID: circuit.Outgoing.ChanID,
 						AmtIn:          circuit.IncomingAmount,
+						TokenAmtIn:     circuit.IncomingTokenAmount,
 						AmtOut:         circuit.OutgoingAmount,
+						TokenAmtOut:    circuit.OutgoingTokenAmount,
 					},
 				)
 				s.fwdEventMtx.Unlock()

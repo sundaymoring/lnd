@@ -22,7 +22,7 @@ type packetQueue struct {
 	// residing within the overflow queue. This value should only read or
 	// modified *atomically*.
 	totalHtlcAmt int64 // To be used atomically.
-
+	totalHtlcTokenAmt int64 // To be used atomically.
 	// queueLen is an internal counter that reflects the size of the queue
 	// at any given instance. This value is intended to be use atomically
 	// as this value is used by internal methods to obtain the length of
@@ -143,6 +143,7 @@ func (p *packetQueue) packetCoordinator() {
 				p.queue = p.queue[1:]
 				atomic.AddInt32(&p.queueLen, -1)
 				atomic.AddInt64(&p.totalHtlcAmt, int64(-nextPkt.amount))
+				atomic.AddInt64(&p.totalHtlcTokenAmt, int64(-nextPkt.tokenAmount))
 				p.queueCond.L.Unlock()
 			case <-p.quit:
 				return
@@ -166,6 +167,7 @@ func (p *packetQueue) AddPkt(pkt *htlcPacket) {
 	p.queue = append(p.queue, pkt)
 	atomic.AddInt32(&p.queueLen, 1)
 	atomic.AddInt64(&p.totalHtlcAmt, int64(pkt.amount))
+	atomic.AddInt64(&p.totalHtlcTokenAmt, int64(pkt.tokenAmount))
 	p.queueCond.L.Unlock()
 
 	// With the message added, we signal to the msgConsumer that there are

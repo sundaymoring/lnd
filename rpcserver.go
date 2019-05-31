@@ -2069,6 +2069,10 @@ func (r *rpcServer) WalletBalance(ctx context.Context,
 
 	var tokens []*lnrpc.TokenBalance
 	for k,v := range *tokenTotalBal {
+		if !k.IsValid() {
+			continue
+		}
+		
 		token := lnrpc.TokenBalance {
 			TokenId: k.ToString(),
 			TokenTotalBalance: int64(v),
@@ -4954,6 +4958,9 @@ func (r *rpcServer) ForwardingHistory(ctx context.Context,
 	for i, event := range timeSlice.ForwardingEvents {
 		amtInSat := event.AmtIn.ToSatoshis()
 		amtOutSat := event.AmtOut.ToSatoshis()
+		tokenAmtInSat := event.TokenAmtIn.ToSatoshis()
+		tokenAmtOutSat := event.TokenAmtOut.ToSatoshis()
+
 		feeMsat := event.AmtIn - event.AmtOut
 
 		resp.ForwardingEvents[i] = &lnrpc.ForwardingEvent{
@@ -4961,7 +4968,9 @@ func (r *rpcServer) ForwardingHistory(ctx context.Context,
 			ChanIdIn:  event.IncomingChanID.ToUint64(),
 			ChanIdOut: event.OutgoingChanID.ToUint64(),
 			AmtIn:     uint64(amtInSat),
+			TokenAmtIn:uint64(tokenAmtInSat),
 			AmtOut:    uint64(amtOutSat),
+			TokenAmtOut:uint64(tokenAmtOutSat),
 			Fee:       uint64(feeMsat.ToSatoshis()),
 			FeeMsat:   uint64(feeMsat),
 		}

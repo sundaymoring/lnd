@@ -44,11 +44,12 @@ type PaymentCircuit struct {
 
 	// IncomingAmount is the value of the HTLC from the incoming link.
 	IncomingAmount lnwire.MilliSatoshi
+	IncomingTokenAmount lnwire.MilliSatoshi
 
 	// OutgoingAmount specifies the value of the HTLC leaving the switch,
 	// either as a payment or forwarded amount.
 	OutgoingAmount lnwire.MilliSatoshi
-
+	OutgoingTokenAmount lnwire.MilliSatoshi
 	// ErrorEncrypter is used to re-encrypt the onion failure before
 	// sending it back to the originator of the payment.
 	ErrorEncrypter ErrorEncrypter
@@ -83,7 +84,9 @@ func newPaymentCircuit(hash *[32]byte, pkt *htlcPacket) *PaymentCircuit {
 		},
 		PaymentHash:    *hash,
 		IncomingAmount: pkt.incomingAmount,
+		IncomingTokenAmount: pkt.incomingTokenAmount,
 		OutgoingAmount: pkt.amount,
+		OutgoingTokenAmount: pkt.tokenAmount,
 		ErrorEncrypter: pkt.obfuscator,
 	}
 }
@@ -104,7 +107,9 @@ func makePaymentCircuit(hash *[32]byte, pkt *htlcPacket) PaymentCircuit {
 		},
 		PaymentHash:    *hash,
 		IncomingAmount: pkt.incomingAmount,
+		IncomingTokenAmount: pkt.incomingTokenAmount,
 		OutgoingAmount: pkt.amount,
+		OutgoingTokenAmount: pkt.tokenAmount,
 		ErrorEncrypter: pkt.obfuscator,
 	}
 }
@@ -130,7 +135,17 @@ func (c *PaymentCircuit) Encode(w io.Writer) error {
 		return err
 	}
 
+	binary.BigEndian.PutUint64(scratch[:], uint64(c.IncomingTokenAmount))
+	if _, err := w.Write(scratch[:]); err != nil {
+		return err
+	}
+
 	binary.BigEndian.PutUint64(scratch[:], uint64(c.OutgoingAmount))
+	if _, err := w.Write(scratch[:]); err != nil {
+		return err
+	}
+
+	binary.BigEndian.PutUint64(scratch[:], uint64(c.OutgoingTokenAmount))
 	if _, err := w.Write(scratch[:]); err != nil {
 		return err
 	}
@@ -179,7 +194,19 @@ func (c *PaymentCircuit) Decode(r io.Reader) error {
 	if _, err := io.ReadFull(r, scratch[:]); err != nil {
 		return err
 	}
+	c.IncomingTokenAmount = lnwire.MilliSatoshi(
+		binary.BigEndian.Uint64(scratch[:]))
+
+	if _, err := io.ReadFull(r, scratch[:]); err != nil {
+		return err
+	}
 	c.OutgoingAmount = lnwire.MilliSatoshi(
+		binary.BigEndian.Uint64(scratch[:]))
+
+	if _, err := io.ReadFull(r, scratch[:]); err != nil {
+		return err
+	}
+	c.OutgoingTokenAmount = lnwire.MilliSatoshi(
 		binary.BigEndian.Uint64(scratch[:]))
 
 	// Read the encrypter type used for this circuit.

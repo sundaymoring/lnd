@@ -73,10 +73,11 @@ type ForwardingEvent struct {
 	// AmtIn is the amount of the incoming HTLC. Subtracting this from the
 	// outgoing amount gives the total fees of this payment circuit.
 	AmtIn lnwire.MilliSatoshi
-
+	TokenAmtIn lnwire.MilliSatoshi
 	// AmtOut is the amount of the outgoing HTLC. Subtracting the incoming
 	// amount from this gives the total fees for this payment circuit.
 	AmtOut lnwire.MilliSatoshi
+	TokenAmtOut lnwire.MilliSatoshi
 }
 
 // encodeForwardingEvent writes out the target forwarding event to the passed
@@ -84,7 +85,7 @@ type ForwardingEvent struct {
 // serialized as this will be the key value within the bucket.
 func encodeForwardingEvent(w io.Writer, f *ForwardingEvent) error {
 	return WriteElements(
-		w, f.IncomingChanID, f.OutgoingChanID, f.AmtIn, f.AmtOut,
+		w, f.IncomingChanID, f.OutgoingChanID, f.AmtIn, f.TokenAmtIn, f.AmtOut, f.TokenAmtOut,
 	)
 }
 
@@ -94,7 +95,7 @@ func encodeForwardingEvent(w io.Writer, f *ForwardingEvent) error {
 // structure of the forwarding log.
 func decodeForwardingEvent(r io.Reader, f *ForwardingEvent) error {
 	return ReadElements(
-		r, &f.IncomingChanID, &f.OutgoingChanID, &f.AmtIn, &f.AmtOut,
+		r, &f.IncomingChanID, &f.OutgoingChanID, &f.AmtIn, &f.TokenAmtIn, &f.AmtOut, &f.TokenAmtOut,
 	)
 }
 

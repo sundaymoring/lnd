@@ -6,11 +6,11 @@ package wire
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"io"
 	"strconv"
-	"encoding/hex"
 )
 
 const (

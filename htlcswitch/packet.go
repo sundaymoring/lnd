@@ -27,6 +27,7 @@ type htlcPacket struct {
 	// forwarding event for this circuit/packet in the case the payment
 	// circuit is successful.
 	incomingHtlcAmt lnwire.MilliSatoshi
+	incomingHtlcTokenAmt lnwire.MilliSatoshi
 
 	// outgoingHTLCID is the ID of the HTLC that we offered to the peer on the
 	// outgoing channel.
@@ -45,9 +46,10 @@ type htlcPacket struct {
 	// incomingAmount is the value in milli-satoshis that arrived on an
 	// incoming link.
 	incomingAmount lnwire.MilliSatoshi
-
+	incomingTokenAmount lnwire.MilliSatoshi
 	// amount is the value of the HTLC that is being created or modified.
 	amount lnwire.MilliSatoshi
+	tokenAmount lnwire.MilliSatoshi
 
 	// htlc lnwire message type of which depends on switch request type.
 	htlc lnwire.Message
@@ -85,6 +87,7 @@ type htlcPacket struct {
 	// will be extraced from the hop payload recevived by the incoming
 	// link.
 	outgoingTimeout uint32
+
 }
 
 // inKey returns the circuit key used to identify the incoming htlc.

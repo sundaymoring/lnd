@@ -5482,7 +5482,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("satisfied", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 1500, 1000,
-			200, 150, 0)
+			200, 150, 0, 0, 0)
 		if result != nil {
 			t.Fatalf("expected policy to be satisfied")
 		}
@@ -5490,7 +5490,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("below minhtlc", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 100, 50,
-			200, 150, 0)
+			200, 150, 0, 0, 0)
 		if _, ok := result.(*lnwire.FailAmountBelowMinimum); !ok {
 			t.Fatalf("expected FailAmountBelowMinimum failure code")
 		}
@@ -5498,7 +5498,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("above maxhtlc", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 1500, 1200,
-			200, 150, 0)
+			200, 150, 0, 0, 0)
 		if _, ok := result.(*lnwire.FailTemporaryChannelFailure); !ok {
 			t.Fatalf("expected FailTemporaryChannelFailure failure code")
 		}
@@ -5506,7 +5506,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("insufficient fee", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 1005, 1000,
-			200, 150, 0)
+			200, 150, 0, 0, 0)
 		if _, ok := result.(*lnwire.FailFeeInsufficient); !ok {
 			t.Fatalf("expected FailFeeInsufficient failure code")
 		}
@@ -5514,7 +5514,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("expiry too soon", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 1500, 1000,
-			200, 150, 190)
+			200, 150, 190, 0, 0)
 		if _, ok := result.(*lnwire.FailExpiryTooSoon); !ok {
 			t.Fatalf("expected FailExpiryTooSoon failure code")
 		}
@@ -5522,7 +5522,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 
 	t.Run("incorrect cltv expiry", func(t *testing.T) {
 		result := link.HtlcSatifiesPolicy(hash, 1500, 1000,
-			200, 190, 0)
+			200, 190, 0, 0, 0)
 		if _, ok := result.(*lnwire.FailIncorrectCltvExpiry); !ok {
 			t.Fatalf("expected FailIncorrectCltvExpiry failure code")
 		}
@@ -5532,7 +5532,7 @@ func TestHtlcSatisfyPolicy(t *testing.T) {
 	t.Run("cltv expiry too far in the future", func(t *testing.T) {
 		// Check that expiry isn't too far in the future.
 		result := link.HtlcSatifiesPolicy(hash, 1500, 1000,
-			10200, 10100, 0)
+			10200, 10100, 0, 0, 0)
 		if _, ok := result.(*lnwire.FailExpiryTooFar); !ok {
 			t.Fatalf("expected FailExpiryTooFar failure code")
 		}

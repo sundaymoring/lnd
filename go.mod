@@ -52,6 +52,8 @@ replace github.com/lightningnetwork/lnd/ticker => ./ticker
 
 replace github.com/lightningnetwork/lnd/queue => ./queue
 
+replace github.com/lightningnetwork/lightning-onion => ./onion
+
 replace github.com/btcsuite/btcd => ./btcsuite/btcd
 
 replace github.com/btcsuite/btcwallet => ./btcsuite/btcwallet

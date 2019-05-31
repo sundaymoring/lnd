@@ -1751,6 +1751,7 @@ func (r *ChannelRouter) sendToSwitch(route *Route, paymentHash [32]byte) (
 	// payment through the network, starting with the first-hop.
 	htlcAdd := &lnwire.UpdateAddHTLC{
 		Amount:      route.TotalAmount,
+		TokenAmount: route.TotalTokenAmount,
 		Expiry:      route.TotalTimeLock,
 		PaymentHash: paymentHash,
 	}

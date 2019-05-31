@@ -663,7 +663,8 @@ func (f *mockChannelLink) HandleChannelUpdate(lnwire.Message) {
 func (f *mockChannelLink) UpdateForwardingPolicy(_ ForwardingPolicy) {
 }
 func (f *mockChannelLink) HtlcSatifiesPolicy([32]byte, lnwire.MilliSatoshi,
-	lnwire.MilliSatoshi, uint32, uint32, uint32) lnwire.FailureMessage {
+	lnwire.MilliSatoshi, uint32, uint32, uint32,
+	lnwire.MilliSatoshi,  lnwire.MilliSatoshi) lnwire.FailureMessage {
 	return nil
 }
 

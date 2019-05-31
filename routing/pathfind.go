@@ -191,6 +191,7 @@ func (r *Route) ToHopPayloads() []sphinx.HopData {
 			// an enum actually?
 			Realm:         0,
 			ForwardAmount: uint64(hop.AmtToForward),
+			ForwardTokenAmount: uint64(hop.TokenAmtToForward),
 			OutgoingCltv:  hop.OutgoingTimeLock,
 		}
 

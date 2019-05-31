@@ -7962,6 +7962,8 @@ type ForwardingEvent struct {
 	Fee uint64 `protobuf:"varint,7,opt,name=fee,proto3" json:"fee,omitempty"`
 	// / The total fee (in milli-satoshis) that this payment circuit carried.
 	FeeMsat              uint64   `protobuf:"varint,8,opt,name=fee_msat,proto3" json:"fee_msat,omitempty"`
+	TokenAmtIn uint64 `protobuf:"varint,8,opt,name=token_amt_in,proto3" json:"token_amt_in,omitempty"`
+	TokenAmtOut uint64 `protobuf:"varint,9,opt,name=token_amt_out,proto3" json:"token_amt_out,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -8019,7 +8021,21 @@ func (m *ForwardingEvent) GetAmtIn() uint64 {
 	return 0
 }
 
+func (m *ForwardingEvent) GetTokenAmtIn() uint64 {
+	if m != nil {
+		return m.TokenAmtIn
+	}
+	return 0
+}
+
 func (m *ForwardingEvent) GetAmtOut() uint64 {
+	if m != nil {
+		return m.TokenAmtOut
+	}
+	return 0
+}
+
+func (m *ForwardingEvent) GetTokenAmtOut() uint64 {
 	if m != nil {
 		return m.AmtOut
 	}

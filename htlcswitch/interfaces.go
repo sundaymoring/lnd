@@ -94,7 +94,8 @@ type ChannelLink interface {
 	HtlcSatifiesPolicy(payHash [32]byte, incomingAmt lnwire.MilliSatoshi,
 		amtToForward lnwire.MilliSatoshi,
 		incomingTimeout, outgoingTimeout uint32,
-		heightNow uint32) lnwire.FailureMessage
+		heightNow uint32, incomingTokenAmt lnwire.MilliSatoshi,
+		tokenAmtToForward lnwire.MilliSatoshi) lnwire.FailureMessage
 
 	// Bandwidth returns the amount of milli-satoshis which current link
 	// might pass through channel link. The value returned from this method

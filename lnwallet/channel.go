@@ -6394,7 +6394,7 @@ func CreateCooperativeCloseTx(fundingTxIn wire.TxIn,
 	closeTx.AddTxIn(&fundingTxIn)
 
 	if tokenId != nil && tokenId.IsValid() {
-		AddTokenSendTxout(closeTx, tokenId, int64(ourBalance + theirBalance))
+		AddTokenSendTxout(closeTx, tokenId, int64(ourTokenBalance + theirTokenBalance))
 	}
 
 	// Create both cooperative closure outputs, properly respecting the
@@ -6569,9 +6569,6 @@ func AddTokenSendTxout(tx *wire.MsgTx, tokenId *wire.TokenId, totalTokenAmount i
 		//	}
 		//	return s
 		//}
-
-		//reverseTokenId := wire.TokenId{}
-		//reverseTokenId.SetBytes(tokenId[:])
 		builder := txscript.NewScriptBuilder()
 		builder.AddOps(scriptHeader[:])
 		builder.AddData(payload.Bytes())

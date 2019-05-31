@@ -1938,7 +1938,8 @@ func (l *channelLink) UpdateForwardingPolicy(newPolicy ForwardingPolicy) {
 func (l *channelLink) HtlcSatifiesPolicy(payHash [32]byte,
 	incomingHtlcAmt, amtToForward lnwire.MilliSatoshi,
 	incomingTimeout, outgoingTimeout uint32,
-	heightNow uint32) lnwire.FailureMessage {
+	heightNow uint32, incomingTokenAmt lnwire.MilliSatoshi,
+	tokenAmtToForward lnwire.MilliSatoshi) lnwire.FailureMessage {
 
 	l.RLock()
 	policy := l.cfg.FwrdingPolicy
@@ -2605,6 +2606,7 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				addMsg := &lnwire.UpdateAddHTLC{
 					Expiry:      fwdInfo.OutgoingCTLV,
 					Amount:      fwdInfo.AmountToForward,
+					TokenAmount: fwdInfo.TokenAmountToForward,
 					PaymentHash: pd.RHash,
 				}
 
@@ -2624,7 +2626,9 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 					outgoingChanID:  fwdInfo.NextHop,
 					sourceRef:       pd.SourceRef,
 					incomingAmount:  pd.Amount,
+					incomingTokenAmount:  pd.TokenAmount,
 					amount:          addMsg.Amount,
+					tokenAmount:     addMsg.TokenAmount,
 					htlc:            addMsg,
 					obfuscator:      obfuscator,
 					incomingTimeout: pd.Timeout,
@@ -2646,6 +2650,7 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 			addMsg := &lnwire.UpdateAddHTLC{
 				Expiry:      fwdInfo.OutgoingCTLV,
 				Amount:      fwdInfo.AmountToForward,
+				TokenAmount: fwdInfo.TokenAmountToForward,
 				PaymentHash: pd.RHash,
 			}
 
@@ -2692,7 +2697,9 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 					outgoingChanID:  fwdInfo.NextHop,
 					sourceRef:       pd.SourceRef,
 					incomingAmount:  pd.Amount,
+					incomingTokenAmount:  pd.TokenAmount,
 					amount:          addMsg.Amount,
+					tokenAmount:     addMsg.TokenAmount,
 					htlc:            addMsg,
 					obfuscator:      obfuscator,
 					incomingTimeout: pd.Timeout,
