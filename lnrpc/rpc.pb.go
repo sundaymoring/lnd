@@ -2212,46 +2212,56 @@ type Channel struct {
 	ChanId uint64 `protobuf:"varint,4,opt,name=chan_id,proto3" json:"chan_id,omitempty"`
 	// / The total amount of funds held in this channel
 	Capacity int64 `protobuf:"varint,5,opt,name=capacity,proto3" json:"capacity,omitempty"`
+
+	// for token
+	TokenCapacity int64 `protobuf:"varint,6,opt,name=token_capacity,proto3" json:"token_capacity,omitempty"`
+	TokenId string `protobuf:"bytes,7,opt,name=token_id,proto3" json:"token_id,omitempty"`
+
 	// / This node's current balance in this channel
-	LocalBalance int64 `protobuf:"varint,6,opt,name=local_balance,proto3" json:"local_balance,omitempty"`
+	LocalBalance int64 `protobuf:"varint,8,opt,name=local_balance,proto3" json:"local_balance,omitempty"`
+	TokenLocalBalance int64 `protobuf:"varint,9,opt,name=token_local_balance,proto3" json:"token_local_balance,omitempty"`
 	// / The counterparty's current balance in this channel
-	RemoteBalance int64 `protobuf:"varint,7,opt,name=remote_balance,proto3" json:"remote_balance,omitempty"`
+	RemoteBalance int64 `protobuf:"varint,10,opt,name=remote_balance,proto3" json:"remote_balance,omitempty"`
+	TokenRemoteBalance int64 `protobuf:"varint,11,opt,name=token_remote_balance,proto3" json:"token_remote_balance,omitempty"`
 	// *
 	// The amount calculated to be paid in fees for the current set of commitment
 	// transactions. The fee amount is persisted with the channel in order to
 	// allow the fee amount to be removed and recalculated with each channel state
 	// update, including updates that happen after a system restart.
-	CommitFee int64 `protobuf:"varint,8,opt,name=commit_fee,proto3" json:"commit_fee,omitempty"`
+	CommitFee int64 `protobuf:"varint,12,opt,name=commit_fee,proto3" json:"commit_fee,omitempty"`
 	// / The weight of the commitment transaction
-	CommitWeight int64 `protobuf:"varint,9,opt,name=commit_weight,proto3" json:"commit_weight,omitempty"`
+	CommitWeight int64 `protobuf:"varint,13,opt,name=commit_weight,proto3" json:"commit_weight,omitempty"`
 	// *
 	// The required number of satoshis per kilo-weight that the requester will pay
 	// at all times, for both the funding transaction and commitment transaction.
 	// This value can later be updated once the channel is open.
-	FeePerKw int64 `protobuf:"varint,10,opt,name=fee_per_kw,proto3" json:"fee_per_kw,omitempty"`
+	FeePerKw int64 `protobuf:"varint,14,opt,name=fee_per_kw,proto3" json:"fee_per_kw,omitempty"`
 	// / The unsettled balance in this channel
-	UnsettledBalance int64 `protobuf:"varint,11,opt,name=unsettled_balance,proto3" json:"unsettled_balance,omitempty"`
+	UnsettledBalance int64 `protobuf:"varint,15,opt,name=unsettled_balance,proto3" json:"unsettled_balance,omitempty"`
+	TokenUnsettledBalance int64 `protobuf:"varint,16,opt,name=token_unsettled_balance,proto3" json:"token_unsettled_balance,omitempty"`
 	// *
 	// The total number of satoshis we've sent within this channel.
-	TotalSatoshisSent int64 `protobuf:"varint,12,opt,name=total_satoshis_sent,proto3" json:"total_satoshis_sent,omitempty"`
+	TotalSatoshisSent int64 `protobuf:"varint,17,opt,name=total_satoshis_sent,proto3" json:"total_satoshis_sent,omitempty"`
+	TokenTotalSatoshisSent int64 `protobuf:"varint,18,opt,name=token_total_satoshis_sent,proto3" json:"token_total_satoshis_sent,omitempty"`
 	// *
 	// The total number of satoshis we've received within this channel.
-	TotalSatoshisReceived int64 `protobuf:"varint,13,opt,name=total_satoshis_received,proto3" json:"total_satoshis_received,omitempty"`
+	TotalSatoshisReceived int64 `protobuf:"varint,19,opt,name=total_satoshis_received,proto3" json:"total_satoshis_received,omitempty"`
+	TokenTotalSatoshisReceived int64 `protobuf:"varint,20,opt,name=token_total_satoshis_received,proto3" json:"token_total_satoshis_received,omitempty"`
 	// *
 	// The total number of updates conducted within this channel.
-	NumUpdates uint64 `protobuf:"varint,14,opt,name=num_updates,proto3" json:"num_updates,omitempty"`
+	NumUpdates uint64 `protobuf:"varint,21,opt,name=num_updates,proto3" json:"num_updates,omitempty"`
 	// *
 	// The list of active, uncleared HTLCs currently pending within the channel.
-	PendingHtlcs []*HTLC `protobuf:"bytes,15,rep,name=pending_htlcs,proto3" json:"pending_htlcs,omitempty"`
+	PendingHtlcs []*HTLC `protobuf:"bytes,22,rep,name=pending_htlcs,proto3" json:"pending_htlcs,omitempty"`
 	// *
 	// The CSV delay expressed in relative blocks. If the channel is force
 	// closed, we'll need to wait for this many blocks before we can regain our
 	// funds.
-	CsvDelay uint32 `protobuf:"varint,16,opt,name=csv_delay,proto3" json:"csv_delay,omitempty"`
+	CsvDelay uint32 `protobuf:"varint,23,opt,name=csv_delay,proto3" json:"csv_delay,omitempty"`
 	// / Whether this channel is advertised to the network or not.
-	Private bool `protobuf:"varint,17,opt,name=private,proto3" json:"private,omitempty"`
+	Private bool `protobuf:"varint,24,opt,name=private,proto3" json:"private,omitempty"`
 	// / True if we were the ones that created the channel.
-	Initiator            bool     `protobuf:"varint,18,opt,name=initiator,proto3" json:"initiator,omitempty"`
+	Initiator            bool     `protobuf:"varint,25,opt,name=initiator,proto3" json:"initiator,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

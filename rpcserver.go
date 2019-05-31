@@ -2553,6 +2553,8 @@ func createRPCOpenChannel(r *rpcServer, graph *channeldb.ChannelGraph,
 
 	localBalance := localCommit.LocalBalance
 	remoteBalance := localCommit.RemoteBalance
+	tokenLocalBalance := localCommit.LocalTokenBalance
+	tokenRemoteBalance := localCommit.RemoteTokenBalance
 
 	// As an artifact of our usage of mSAT internally, either party
 	// may end up in a state where they're holding a fractional
@@ -2574,13 +2576,19 @@ func createRPCOpenChannel(r *rpcServer, graph *channeldb.ChannelGraph,
 		ChannelPoint:          chanPoint.String(),
 		ChanId:                chanID,
 		Capacity:              int64(dbChannel.Capacity),
+		TokenCapacity:         int64(dbChannel.TokenCapacity),
+		TokenId:               dbChannel.TokenId.ToString(),
 		LocalBalance:          int64(localBalance.ToSatoshis()),
+		TokenLocalBalance:     int64(tokenLocalBalance.ToSatoshis()),
 		RemoteBalance:         int64(remoteBalance.ToSatoshis()),
+		TokenRemoteBalance:    int64(tokenRemoteBalance.ToSatoshis()),
 		CommitFee:             int64(externalCommitFee),
 		CommitWeight:          commitWeight,
 		FeePerKw:              int64(localCommit.FeePerKw),
 		TotalSatoshisSent:     int64(dbChannel.TotalMSatSent.ToSatoshis()),
+		TokenTotalSatoshisSent:int64(dbChannel.TokenTotalMSatSent.ToSatoshis()),
 		TotalSatoshisReceived: int64(dbChannel.TotalMSatReceived.ToSatoshis()),
+		TokenTotalSatoshisReceived: int64(dbChannel.TokenTotalMSatReceived.ToSatoshis()),
 		NumUpdates:            localCommit.CommitHeight,
 		PendingHtlcs:          make([]*lnrpc.HTLC, len(localCommit.Htlcs)),
 		CsvDelay:              uint32(dbChannel.LocalChanCfg.CsvDelay),
