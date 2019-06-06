@@ -2108,8 +2108,11 @@ func (r *rpcServer) ChannelBalance(ctx context.Context,
 	}
 
 	var balance btcutil.Amount
+	tokenBalance := make(map[wire.TokenId]btcutil.Amount)
+
 	for _, channel := range openChannels {
 		balance += channel.LocalCommitment.LocalBalance.ToSatoshis()
+		tokenBalance[channel.TokenId] += channel.LocalCommitment.LocalTokenBalance.ToSatoshis()
 	}
 
 	pendingChannels, err := r.server.chanDB.FetchPendingChannels()
@@ -2118,13 +2121,48 @@ func (r *rpcServer) ChannelBalance(ctx context.Context,
 	}
 
 	var pendingOpenBalance btcutil.Amount
+	tokenPendingBalance := make(map[wire.TokenId]btcutil.Amount)
 	for _, channel := range pendingChannels {
 		pendingOpenBalance += channel.LocalCommitment.LocalBalance.ToSatoshis()
+		tokenPendingBalance[channel.TokenId] += channel.LocalCommitment.LocalTokenBalance.ToSatoshis()
+	}
+
+	// tokens balance ande pending balance
+	mTokens := make(map[wire.TokenId]lnrpc.ChannelTokenBalance)
+	for k, v := range tokenBalance {
+		symbol, err := r.server.cc.chainIO.GetTokenSymbol(&k)
+		if err != nil {
+			return nil, err
+		}
+		mTokens[k] = lnrpc.ChannelTokenBalance{
+			Symbol: symbol,
+			TokenBalance: int64(v),
+		}
+	}
+	for k, v := range tokenPendingBalance {
+		if b, ok := mTokens[k]; ok {
+			b.TokenPendingOpenBalance = int64(v)
+		} else {
+			symbol, err := r.server.cc.chainIO.GetTokenSymbol(&k)
+			if err != nil {
+				return nil, err
+			}
+			mTokens[k] = lnrpc.ChannelTokenBalance{
+				Symbol: symbol,
+				TokenPendingOpenBalance: int64(v),
+			}
+		}
+	}
+
+	var t []*lnrpc.ChannelTokenBalance = make([]*lnrpc.ChannelTokenBalance, 0, len(mTokens))
+	for _,v := range mTokens {
+		t = append(t, &v)
 	}
 
 	return &lnrpc.ChannelBalanceResponse{
 		Balance:            int64(balance),
 		PendingOpenBalance: int64(pendingOpenBalance),
+		Tokens: t,
 	}, nil
 }
 
