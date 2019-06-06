@@ -1334,7 +1334,6 @@ func pathsToFeeSortedRoutes(source Vertex, paths [][]*channeldb.ChannelEdgePolic
 func (r *ChannelRouter) FindRoutes(source, target Vertex,
 	amt lnwire.MilliSatoshi, restrictions *RestrictParams, numPaths uint32, amtToken lnwire.MilliSatoshi, tokenId wire.TokenId,
 	finalExpiry ...uint16) ([]*Route, error) {
-
 	var finalCLTVDelta uint16
 	if len(finalExpiry) == 0 {
 		finalCLTVDelta = DefaultFinalCLTVDelta
@@ -1424,6 +1423,7 @@ func (r *ChannelRouter) FindRoutes(source, target Vertex,
 		sourceVertex, shortestPaths, finalCLTVDelta, amt,
 		uint32(currentHeight), amtToken, tokenId,
 	)
+
 	if err != nil {
 		return nil, err
 	}

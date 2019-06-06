@@ -1447,21 +1447,26 @@ func initStateHints(commit1, commit2 *wire.MsgTx,
 // change+fees.
 // note: amt represent token amt. tokeid represent btc or other token coin.
 func selectInputs(amt btcutil.Amount, amtToken btcutil.Amount, tokenId *wire.TokenId, coins []*Utxo) (btcutil.Amount, btcutil.Amount, []*Utxo, error) {
+	selectedUtxo := []*Utxo{}
+
 	satSelected := btcutil.Amount(0)
 	satTokenSelected := btcutil.Amount(0)
-	for i, coin := range coins {
-		if *tokenId != coin.TokenId {
-			if !coin.TokenId.IsValid() && satSelected < amt {
+	for _, coin := range coins {
+		if coin.TokenId.IsValid() {
+			if satTokenSelected < amtToken && coin.TokenId.IsEqual(tokenId) {
 				satSelected += coin.Value
+				satTokenSelected += coin.TokenValue
+				selectedUtxo = append(selectedUtxo, coin)
 			}
-		}else {
-			satSelected += coin.Value
-			satTokenSelected += coin.TokenValue
+		} else {
+			if satSelected < amt {
+				satSelected += coin.Value
+				selectedUtxo = append(selectedUtxo, coin)
+			}
 		}
 
-
 		if satSelected >= amt && satTokenSelected >= amtToken {
-			return satSelected, satTokenSelected, coins[:i+1], nil
+			return satSelected, satTokenSelected, selectedUtxo, nil
 		}
 	}
 	return 0, 0, nil, &ErrInsufficientFunds{amt, satSelected}

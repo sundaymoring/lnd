@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 	"io"
 	"io/ioutil"
 	"math"
@@ -2079,6 +2080,7 @@ func sendPayment(ctx *cli.Context) error {
 		req := &lnrpc.SendRequest{
 			PaymentRequest: ctx.String("pay_req"),
 			Amt:            ctx.Int64("amt"),
+			TokenAmt:       ctx.Int64("token_amt"),
 			FeeLimit:       feeLimit,
 			OutgoingChanId: ctx.Uint64("outgoing_chan_id"),
 		}
@@ -2121,9 +2123,16 @@ func sendPayment(ctx *cli.Context) error {
 		}
 	}
 
+	var tokenAmount int64
+	if ctx.IsSet("token_amt") {
+		tokenAmount = ctx.Int64("token_amt")
+	}
+
+
 	req := &lnrpc.SendRequest{
 		Dest:     destNode,
 		Amt:      amount,
+		TokenAmt: tokenAmount,
 		FeeLimit: feeLimit,
 	}
 
@@ -2219,6 +2228,11 @@ var payInvoiceCommand = cli.Command{
 				"invoice",
 		},
 		cli.Int64Flag{
+			Name: "token_amt",
+			Usage: "(optional) number of satoshis to fulfill the " +
+				"invoice for token",
+		},
+		cli.Int64Flag{
 			Name: "fee_limit",
 			Usage: "maximum fee allowed in satoshis when sending " +
 				"the payment",
@@ -2272,6 +2286,8 @@ func payInvoice(ctx *cli.Context) error {
 	req := &lnrpc.SendRequest{
 		PaymentRequest: payReq,
 		Amt:            ctx.Int64("amt"),
+		Symbol:			ctx.String("symbol"),
+		TokenAmt:       ctx.Int64("token_amt"),
 		FeeLimit:       feeLimit,
 		OutgoingChanId: ctx.Uint64("outgoing_chan_id"),
 	}
@@ -2484,6 +2500,10 @@ var addInvoiceCommand = cli.Command{
 			Name: "symbol",
 			Usage: "(optional) the token in this invoice",
 		},
+		cli.Int64Flag{
+			Name:  "token_amt",
+			Usage: "the token amt of satoshis in this invoice",
+		},
 	},
 	Action: actionDecorator(addInvoice),
 }
@@ -2494,6 +2514,7 @@ func addInvoice(ctx *cli.Context) error {
 		descHash []byte
 		receipt  []byte
 		amt      int64
+		tokenAmt int64
 		symbol 	 string
 		err      error
 	)
@@ -2537,6 +2558,18 @@ func addInvoice(ctx *cli.Context) error {
 
 	if ctx.IsSet("symbol") {
 		symbol = ctx.String("symbol")
+		if ctx.IsSet("token_amt") {
+			tokenAmt = ctx.Int64("token_amt")
+		}
+
+		if symbol != "" {
+			if tokenAmt <= 0 {
+				tokenAmt = amt
+				amt = wire.DefaultTokenTxVoutMinValue
+			} else if amt <= 0 {
+				amt = wire.DefaultTokenTxVoutMinValue
+			}
+		}
 	}
 
 	invoice := &lnrpc.Invoice{
@@ -2549,6 +2582,7 @@ func addInvoice(ctx *cli.Context) error {
 		Expiry:          ctx.Int64("expiry"),
 		Private:         ctx.Bool("private"),
 		Symbol:			 symbol,
+		TokenValue:      tokenAmt,
 	}
 
 	resp, err := client.AddInvoice(context.Background(), invoice)

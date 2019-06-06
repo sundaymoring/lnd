@@ -449,7 +449,6 @@ type RestrictParams struct {
 // to forward at every node against the available bandwidth.
 func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 	amt lnwire.MilliSatoshi,/*tokenMaxFee btcutil.Amount,*/ amtToken lnwire.MilliSatoshi, tokenId *wire.TokenId) ([]*channeldb.ChannelEdgePolicy, error) {
-
 	var err error
 	tx := g.tx
 	if tx == nil {

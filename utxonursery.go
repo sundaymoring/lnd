@@ -1070,6 +1070,9 @@ type contractMaturityReport struct {
 
 	// htlcs records a maturity report for each htlc output in this channel.
 	htlcs []htlcMaturityReport
+
+	limboTokenBalance btcutil.Amount
+	recoveredTokenBalance btcutil.Amount
 }
 
 // htlcMaturityReport provides a summary of a single htlc output, and is
@@ -1080,6 +1083,7 @@ type htlcMaturityReport struct {
 
 	// amount is the final value that will be swept in back to the wallet.
 	amount btcutil.Amount
+	tokenAmount btcutil.Amount
 
 	// maturityHeight is the absolute block height that this output will
 	// mature at.
@@ -1096,6 +1100,7 @@ type htlcMaturityReport struct {
 // report's htlcs, and contributes its amount to the limbo balance.
 func (c *contractMaturityReport) AddLimboCommitment(kid *kidOutput) {
 	c.limboBalance += kid.Amount()
+	c.limboTokenBalance += kid.TokenAmount()
 
 	// If the confirmation height is set, then this means the contract has
 	// been confirmed, and we know the final maturity height.
@@ -1108,6 +1113,7 @@ func (c *contractMaturityReport) AddLimboCommitment(kid *kidOutput) {
 // report's  htlcs, and contributes its amount to the recovered balance.
 func (c *contractMaturityReport) AddRecoveredCommitment(kid *kidOutput) {
 	c.recoveredBalance += kid.Amount()
+	c.recoveredTokenBalance += kid.TokenAmount()
 
 	c.maturityHeight = kid.BlocksToMaturity() + kid.ConfHeight()
 }
@@ -1116,6 +1122,7 @@ func (c *contractMaturityReport) AddRecoveredCommitment(kid *kidOutput) {
 // htlcs, and contributes its amount to the limbo balance.
 func (c *contractMaturityReport) AddLimboStage1TimeoutHtlc(baby *babyOutput) {
 	c.limboBalance += baby.Amount()
+	c.limboTokenBalance += baby.TokenAmount()
 
 	// TODO(roasbeef): bool to indicate stage 1 vs stage 2?
 	c.htlcs = append(c.htlcs, htlcMaturityReport{
@@ -1123,6 +1130,7 @@ func (c *contractMaturityReport) AddLimboStage1TimeoutHtlc(baby *babyOutput) {
 		amount:         baby.Amount(),
 		maturityHeight: baby.expiry,
 		stage:          1,
+		tokenAmount:    baby.TokenAmount(),
 	})
 }
 
@@ -1131,12 +1139,14 @@ func (c *contractMaturityReport) AddLimboStage1TimeoutHtlc(baby *babyOutput) {
 // has or hasn't expired yet.
 func (c *contractMaturityReport) AddLimboDirectHtlc(kid *kidOutput) {
 	c.limboBalance += kid.Amount()
+	c.limboTokenBalance += kid.TokenAmount()
 
 	htlcReport := htlcMaturityReport{
 		outpoint:       *kid.OutPoint(),
 		amount:         kid.Amount(),
 		maturityHeight: kid.absoluteMaturity,
 		stage:          2,
+		tokenAmount: 	kid.TokenAmount(),
 	}
 
 	c.htlcs = append(c.htlcs, htlcReport)
@@ -1147,11 +1157,13 @@ func (c *contractMaturityReport) AddLimboDirectHtlc(kid *kidOutput) {
 // where the second level transaction hasn't yet confirmed.
 func (c *contractMaturityReport) AddLimboStage1SuccessHtlc(kid *kidOutput) {
 	c.limboBalance += kid.Amount()
+	c.limboTokenBalance += kid.TokenAmount()
 
 	c.htlcs = append(c.htlcs, htlcMaturityReport{
 		outpoint: *kid.OutPoint(),
 		amount:   kid.Amount(),
 		stage:    1,
+		tokenAmount:kid.TokenAmount(),
 	})
 }
 
@@ -1159,11 +1171,13 @@ func (c *contractMaturityReport) AddLimboStage1SuccessHtlc(kid *kidOutput) {
 // htlcs, and contributes its amount to the limbo balance.
 func (c *contractMaturityReport) AddLimboStage2Htlc(kid *kidOutput) {
 	c.limboBalance += kid.Amount()
+	c.limboTokenBalance += kid.TokenAmount()
 
 	htlcReport := htlcMaturityReport{
 		outpoint: *kid.OutPoint(),
 		amount:   kid.Amount(),
 		stage:    2,
+		tokenAmount:kid.TokenAmount(),
 	}
 
 	// If the confirmation height is set, then this means the first stage
@@ -1180,11 +1194,13 @@ func (c *contractMaturityReport) AddLimboStage2Htlc(kid *kidOutput) {
 // contributes its amount to the recovered balance.
 func (c *contractMaturityReport) AddRecoveredHtlc(kid *kidOutput) {
 	c.recoveredBalance += kid.Amount()
+	c.recoveredTokenBalance += kid.TokenAmount()
 
 	c.htlcs = append(c.htlcs, htlcMaturityReport{
 		outpoint:       *kid.OutPoint(),
 		amount:         kid.Amount(),
 		maturityHeight: kid.ConfHeight() + kid.BlocksToMaturity(),
+		tokenAmount:kid.TokenAmount(),
 	})
 }
 
@@ -1433,6 +1449,15 @@ func (k *kidOutput) Encode(w io.Writer) error {
 		return err
 	}
 
+	if err := wire.WriteVarBytes(w, 0, k.tokenId[:]); err != nil {
+		return err
+	}
+
+	binary.BigEndian.PutUint64(scratch[:8], uint64(k.tokenAmt))
+	if _, err := w.Write(scratch[:8]); err != nil {
+		return err
+	}
+
 	return input.WriteSignDescriptor(w, k.SignDesc())
 }
 
@@ -1479,6 +1504,18 @@ func (k *kidOutput) Decode(r io.Reader) error {
 		return err
 	}
 	k.witnessType = input.WitnessType(byteOrder.Uint16(scratch[:2]))
+
+	tokenId, err := wire.ReadVarBytes(r, 0, 1000, "tokenid")
+	if err != nil {
+		return err
+	}
+	k.tokenId.SetBytes(tokenId[:])
+
+
+	if _, err := r.Read(scratch[:]); err != nil {
+		return err
+	}
+	k.tokenAmt = btcutil.Amount(byteOrder.Uint64(scratch[:]))
 
 	return input.ReadSignDescriptor(r, &k.signDesc)
 }

@@ -99,7 +99,7 @@ func TestSettleInvoice(t *testing.T) {
 
 	// Settle invoice with a slightly higher amount.
 	amtPaid := lnwire.MilliSatoshi(100500)
-	err = registry.SettleInvoice(hash, amtPaid)
+	err = registry.SettleInvoice(hash, amtPaid, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,13 +131,13 @@ func TestSettleInvoice(t *testing.T) {
 	}
 
 	// Try to settle again.
-	err = registry.SettleInvoice(hash, amtPaid)
+	err = registry.SettleInvoice(hash, amtPaid, 0)
 	if err != nil {
 		t.Fatal("expected duplicate settle to succeed")
 	}
 
 	// Try to settle again with a different amount.
-	err = registry.SettleInvoice(hash, amtPaid+600)
+	err = registry.SettleInvoice(hash, amtPaid+600, 0)
 	if err != nil {
 		t.Fatal("expected duplicate settle to succeed")
 	}
@@ -262,7 +262,7 @@ func TestCancelInvoice(t *testing.T) {
 	}
 
 	// Try to settle. This should not be possible.
-	err = registry.SettleInvoice(hash, amt)
+	err = registry.SettleInvoice(hash, amt, 0)
 	if err != channeldb.ErrInvoiceAlreadyCanceled {
 		t.Fatal("expected settlement of a canceled invoice to fail")
 	}

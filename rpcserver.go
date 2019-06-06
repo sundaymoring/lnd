@@ -490,13 +490,13 @@ func newRPCServer(s *server, macService *macaroons.Service,
 		MaxPaymentMSat: maxPaymentMSat,
 		SelfNode:       selfNode.PubKeyBytes,
 		FetchChannelCapacity: func(chanID uint64) (btcutil.Amount,
-			error) {
+			btcutil.Amount, error) {
 
 			info, _, _, err := graph.FetchChannelEdgesByID(chanID)
 			if err != nil {
-				return 0, err
+				return 0, 0, err
 			}
-			return info.Capacity, nil
+			return info.Capacity, info.CapacityToken, nil
 		},
 		FindRoutes: s.chanRouter.FindRoutes,
 	}
@@ -2171,6 +2171,10 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 				Capacity:      int64(pendingChan.Capacity),
 				LocalBalance:  int64(localCommitment.LocalBalance.ToSatoshis()),
 				RemoteBalance: int64(localCommitment.RemoteBalance.ToSatoshis()),
+
+				TokenCapacity:      int64(pendingChan.TokenCapacity),
+				LocalTokenBalance:  int64(localCommitment.LocalTokenBalance.ToSatoshis()),
+				RemoteTokenBalance: int64(localCommitment.RemoteTokenBalance.ToSatoshis()),
 			},
 			CommitWeight: commitWeight,
 			CommitFee:    int64(localCommitment.CommitFee),
@@ -2201,6 +2205,9 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 			ChannelPoint:  chanPoint.String(),
 			Capacity:      int64(pendingClose.Capacity),
 			LocalBalance:  int64(pendingClose.SettledBalance),
+
+			TokenCapacity: int64(pendingClose.TokenCapacity),
+			LocalTokenBalance: int64(pendingClose.TokenSettledBalance),
 		}
 
 		closeTXID := pendingClose.ClosingTXID.String()
@@ -2223,6 +2230,7 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 			)
 
 			resp.TotalLimboBalance += channel.LocalBalance
+			resp.TotalLimboTokenBalance += channel.LocalTokenBalance
 
 		// If the channel was force closed, then we'll need to query
 		// the utxoNursery for additional information.
@@ -2253,6 +2261,7 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 			}
 
 			resp.TotalLimboBalance += int64(forceClose.LimboBalance)
+			resp.TotalLimboTokenBalance += int64(forceClose.LimboTokenBalance)
 
 			resp.PendingForceClosingChannels = append(
 				resp.PendingForceClosingChannels,
@@ -2279,6 +2288,9 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 			ChannelPoint:  chanPoint.String(),
 			Capacity:      int64(waitingClose.Capacity),
 			LocalBalance:  int64(waitingClose.LocalCommitment.LocalBalance.ToSatoshis()),
+
+			TokenCapacity: int64(waitingClose.TokenCapacity),
+			LocalTokenBalance:  int64(waitingClose.LocalCommitment.LocalTokenBalance.ToSatoshis()),
 		}
 
 		// A close tx has been broadcasted, all our balance will be in
@@ -2288,10 +2300,12 @@ func (r *rpcServer) PendingChannels(ctx context.Context,
 			&lnrpc.PendingChannelsResponse_WaitingCloseChannel{
 				Channel:      channel,
 				LimboBalance: channel.LocalBalance,
+				LimboTokenBalance: channel.LocalTokenBalance,
 			},
 		)
 
 		resp.TotalLimboBalance += channel.LocalBalance
+		resp.TotalLimboTokenBalance += channel.LocalTokenBalance
 	}
 
 	return resp, nil
@@ -2317,6 +2331,7 @@ func (r *rpcServer) arbitratorPopulateForceCloseResp(chanPoint *wire.OutPoint,
 			Outpoint:       report.Outpoint.String(),
 			MaturityHeight: report.MaturityHeight,
 			Stage:          report.Stage,
+			TokenAmount:    int64(report.TokenAmount),
 		}
 
 		if htlc.MaturityHeight != 0 {
@@ -2326,6 +2341,8 @@ func (r *rpcServer) arbitratorPopulateForceCloseResp(chanPoint *wire.OutPoint,
 
 		forceClose.LimboBalance += int64(report.LimboBalance)
 		forceClose.RecoveredBalance += int64(report.RecoveredBalance)
+		forceClose.LimboTokenBalance += int64(report.LimboTokenBalance)
+		forceClose.RecoveredTokenBalance += int64(report.RecoveredTokenBalance)
 
 		forceClose.PendingHtlcs = append(forceClose.PendingHtlcs, htlc)
 	}
@@ -2358,6 +2375,8 @@ func (r *rpcServer) nurseryPopulateForceCloseResp(chanPoint *wire.OutPoint,
 	// wallet.
 	forceClose.LimboBalance = int64(nurseryInfo.limboBalance)
 	forceClose.RecoveredBalance = int64(nurseryInfo.recoveredBalance)
+	forceClose.LimboTokenBalance = int64(nurseryInfo.limboTokenBalance)
+	forceClose.RecoveredTokenBalance = int64(nurseryInfo.recoveredTokenBalance)
 	forceClose.MaturityHeight = nurseryInfo.maturityHeight
 
 	// If the transaction has been confirmed, then we can compute how many
@@ -2377,6 +2396,7 @@ func (r *rpcServer) nurseryPopulateForceCloseResp(chanPoint *wire.OutPoint,
 			Outpoint:       htlcReport.outpoint.String(),
 			MaturityHeight: htlcReport.maturityHeight,
 			Stage:          htlcReport.stage,
+			TokenAmount: 	int64(htlcReport.tokenAmount),
 		}
 
 		if htlc.MaturityHeight != 0 {
@@ -2731,7 +2751,7 @@ func (r *rpcServer) SubscribeChannelEvents(req *lnrpc.ChannelEventSubscription,
 // savePayment saves a successfully completed payment to the database for
 // historical record keeping.
 func (r *rpcServer) savePayment(route *routing.Route,
-	amount lnwire.MilliSatoshi, preImage []byte) error {
+	amount, tokenAmount lnwire.MilliSatoshi, preImage []byte) error {
 
 	paymentPath := make([][33]byte, len(route.Hops))
 	for i, hop := range route.Hops {
@@ -2743,6 +2763,7 @@ func (r *rpcServer) savePayment(route *routing.Route,
 		Invoice: channeldb.Invoice{
 			Terms: channeldb.ContractTerm{
 				Value: amount,
+				TokenValue: tokenAmount,
 			},
 			CreationDate: time.Now(),
 		},
@@ -2781,6 +2802,7 @@ type paymentStream struct {
 type rpcPaymentRequest struct {
 	*lnrpc.SendRequest
 	routes []*routing.Route
+	TokenId wire.TokenId
 }
 
 // calculateFeeLimit returns the fee limit in millisatoshis. If a percentage
@@ -2810,7 +2832,7 @@ func calculateFeeLimit(feeLimit *lnrpc.FeeLimit,
 // Lightning Network with a single persistent connection.
 func (r *rpcServer) SendPayment(stream lnrpc.Lightning_SendPaymentServer) error {
 	var lock sync.Mutex
-fmt.Printf("sendpayment rpc ============\n")
+
 	return r.sendPayment(&paymentStream{
 		recv: func() (*rpcPaymentRequest, error) {
 			req, err := stream.Recv()
@@ -2818,9 +2840,18 @@ fmt.Printf("sendpayment rpc ============\n")
 				return nil, err
 			}
 
-			return &rpcPaymentRequest{
+			payReq := &rpcPaymentRequest{
 				SendRequest: req,
-			}, nil
+			}
+
+			if req.Symbol != "" {
+				tokenId, err := r.GetTokenIdWithSymbol(req.Symbol)
+				if err != nil {
+					return nil, err
+				}
+				payReq.TokenId.SetBytes(tokenId[:])
+			}
+			return payReq, nil
 		},
 		send: func(r *lnrpc.SendResponse) error {
 			// Calling stream.Send concurrently is not safe.
@@ -2912,6 +2943,9 @@ type rpcPaymentIntent struct {
 	outgoingChannelID *uint64
 
 	routes []*routing.Route
+
+	tokenId			*wire.TokenId
+	tokenMsat       lnwire.MilliSatoshi
 }
 
 // extractPaymentIntent attempts to parse the complete details required to
@@ -2920,7 +2954,6 @@ type rpcPaymentIntent struct {
 // via manual details, or via a complete route.
 func extractPaymentIntent(rpcPayReq *rpcPaymentRequest) (rpcPaymentIntent, error) {
 	payIntent := rpcPaymentIntent{}
-
 	// If a route was specified, then we can use that directly.
 	if len(rpcPayReq.routes) != 0 {
 		// If the user is using the REST interface, then they'll be
@@ -2939,6 +2972,7 @@ func extractPaymentIntent(rpcPayReq *rpcPaymentRequest) (rpcPaymentIntent, error
 		}
 
 		payIntent.routes = rpcPayReq.routes
+		payIntent.tokenId = &rpcPayReq.TokenId
 		return payIntent, nil
 	}
 
@@ -2994,6 +3028,25 @@ func extractPaymentIntent(rpcPayReq *rpcPaymentRequest) (rpcPaymentIntent, error
 		payIntent.cltvDelta = uint16(payReq.MinFinalCLTVExpiry())
 		payIntent.routeHints = payReq.RouteHints
 
+		if payReq.TokenId != nil && payReq.TokenId.IsValid() {
+			payIntent.tokenId = &wire.TokenId{}
+			payIntent.tokenId.SetBytes(payReq.TokenId[:])
+
+			if payReq.TokenMilliSat == nil {
+				if rpcPayReq.TokenAmt == 0 {
+					return payIntent, errors.New("token amount must be " +
+						"specified when paying a zero amount " +
+						"invoice")
+				}
+
+				payIntent.tokenMsat = lnwire.NewMSatFromSatoshis(
+					btcutil.Amount(rpcPayReq.TokenAmt),
+				)
+			} else {
+				payIntent.tokenMsat = *payReq.TokenMilliSat
+			}
+		}
+
 		return payIntent, nil
 	}
 
@@ -3026,6 +3079,13 @@ func extractPaymentIntent(rpcPayReq *rpcPaymentRequest) (rpcPaymentIntent, error
 	payIntent.feeLimit = calculateFeeLimit(
 		rpcPayReq.FeeLimit, payIntent.msat,
 	)
+
+	if rpcPayReq.TokenId.IsValid(){
+		payIntent.tokenId.SetBytes(rpcPayReq.TokenId[:])
+		payIntent.tokenMsat = lnwire.NewMSatFromSatoshis(
+			btcutil.Amount(rpcPayReq.TokenAmt),
+		)
+	}
 
 	payIntent.cltvDelta = uint16(rpcPayReq.FinalCltvDelta)
 
@@ -3080,7 +3140,6 @@ type paymentIntentResponse struct {
 // didn't succeed.
 func (r *rpcServer) dispatchPaymentIntent(
 	payIntent *rpcPaymentIntent) (*paymentIntentResponse, error) {
-
 	// Construct a payment request to send to the channel router. If the
 	// payment is successful, the route chosen will be returned. Otherwise,
 	// we'll get a non-nil error.
@@ -3102,6 +3161,11 @@ func (r *rpcServer) dispatchPaymentIntent(
 			OutgoingChannelID: payIntent.outgoingChannelID,
 		}
 
+		if payIntent.tokenId.IsValid() {
+			payment.TokenId.SetBytes(payIntent.tokenId[:])
+			payment.TokenAmount = payIntent.tokenMsat
+		}
+
 		// If the final CLTV value was specified, then we'll use that
 		// rather than the default.
 		if payIntent.cltvDelta != 0 {
@@ -3114,6 +3178,11 @@ func (r *rpcServer) dispatchPaymentIntent(
 	} else {
 		payment := &routing.LightningPayment{
 			PaymentHash: payIntent.rHash,
+		}
+
+		if payIntent.tokenId.IsValid() {
+			payment.TokenId.SetBytes(payIntent.tokenId[:])
+			payment.TokenAmount = payIntent.tokenMsat
 		}
 
 		preImage, route, routerErr = r.server.chanRouter.SendToRoute(
@@ -3131,16 +3200,22 @@ func (r *rpcServer) dispatchPaymentIntent(
 
 	// If a route was used to complete this payment, then we'll need to
 	// compute the final amount sent
-	var amt lnwire.MilliSatoshi
+	var amt, tokenAmt lnwire.MilliSatoshi
 	if len(payIntent.routes) > 0 {
 		amt = route.TotalAmount - route.TotalFees
+		tokenAmt = route.TotalTokenAmount
 	} else {
 		amt = payIntent.msat
+		tokenAmt = payIntent.tokenMsat
+	}
+
+	if payIntent.tokenId.IsValid() {
+		route.TokenId.SetBytes(payIntent.tokenId[:])
 	}
 
 	// Save the completed payment to the database for record keeping
 	// purposes.
-	err := r.savePayment(route, amt, preImage[:])
+	err := r.savePayment(route, amt, tokenAmt, preImage[:])
 	if err != nil {
 		// We weren't able to save the payment, so we return the save
 		// err, but a nil routing err.
@@ -3388,7 +3463,6 @@ func (r *rpcServer) sendPaymentSync(ctx context.Context,
 // unique payment preimage.
 func (r *rpcServer) AddInvoice(ctx context.Context,
 	invoice *lnrpc.Invoice) (*lnrpc.AddInvoiceResponse, error) {
-
 	var paymentPreimage [32]byte
 
 	switch {
@@ -3427,19 +3501,35 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	}
 
 	// The value of the invoice must not be negative.
-	if invoice.Value < 0 {
+	if invoice.Value < 0 || (invoice.Symbol != "" && invoice.TokenValue < 0) {
 		return nil, fmt.Errorf("payments of negative value "+
-			"are not allowed, value is %v", invoice.Value)
+			"are not allowed, value is %v (token: %v)", invoice.Value, invoice.TokenValue)
+	}
+
+	tokenId, err := r.GetTokenIdWithSymbol(invoice.Symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	if tokenId.IsValid() {
+		if invoice.TokenValue == 0 {
+			invoice.TokenValue = invoice.Value
+			invoice.Value = wire.DefaultTokenTxVoutMinValue
+		} else if invoice.Value == 0 {
+			invoice.Value = wire.DefaultTokenTxVoutMinValue
+		}
 	}
 
 	amt := btcutil.Amount(invoice.Value)
 	amtMSat := lnwire.NewMSatFromSatoshis(amt)
 
+	tokenAmt := btcutil.Amount(invoice.TokenValue)
+	tokenAmtMSat := lnwire.NewMSatFromSatoshis(tokenAmt)
 	// The value of the invoice must also not exceed the current soft-limit
 	// on the largest payment within the network.
-	if amtMSat > maxPaymentMSat {
-		return nil, fmt.Errorf("payment of %v is too large, max "+
-			"payment allowed is %v", amt, maxPaymentMSat.ToSatoshis())
+	if amtMSat > maxPaymentMSat || tokenAmtMSat > maxPaymentMSat {
+		return nil, fmt.Errorf("payment of %v (token: %v)is too large, max "+
+			"payment allowed is %v", amt, tokenAmt, maxPaymentMSat.ToSatoshis())
 	}
 
 	// Next, generate the payment hash itself from the preimage. This will
@@ -3458,6 +3548,13 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	// allow the payee to specify the amount of satoshis they wish to send.
 	if amtMSat > 0 {
 		options = append(options, zpay32.Amount(amtMSat))
+	}
+
+	if tokenId.IsValid() {
+		options = append(options, zpay32.TokenId(tokenId))
+		if tokenAmtMSat > 0 {
+			options = append(options, zpay32.TokenAmount(tokenAmtMSat))
+		}
 	}
 
 	// If specified, add a fallback address to the payment request.
@@ -3555,7 +3652,8 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 			chanPoint := lnwire.NewChanIDFromOutPoint(
 				&channel.FundingOutpoint,
 			)
-			if amtMSat >= channel.LocalCommitment.RemoteBalance {
+			if amtMSat >= channel.LocalCommitment.RemoteBalance ||
+				tokenAmtMSat >= channel.LocalCommitment.RemoteTokenBalance {
 				rpcsLog.Debugf("Skipping channel %v due to "+
 					"not having enough remote balance",
 					chanPoint)
@@ -3646,12 +3744,6 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		}
 	}
 
-	tokenId, err := r.GetTokenIdWithSymbol(invoice.Symbol)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, zpay32.TokenId(tokenId))
-
 	// Create and encode the payment request as a bech32 (zpay32) string.
 	creationDate := time.Now()
 	payReq, err := zpay32.NewInvoice(
@@ -3677,6 +3769,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		PaymentRequest: []byte(payReqString),
 		Terms: channeldb.ContractTerm{
 			Value: amtMSat,
+			TokenValue: tokenAmtMSat,
 		},
 	}
 	copy(newInvoice.Terms.PaymentPreimage[:], paymentPreimage[:])
@@ -3742,9 +3835,12 @@ func (r *rpcServer) LookupInvoice(ctx context.Context,
 			return spew.Sdump(invoice)
 		}))
 
-	rpcInvoice, err := invoicesrpc.CreateRPCInvoice(
+	rpcInvoice, tokenId, err := invoicesrpc.CreateRPCInvoice(
 		&invoice, activeNetParams.Params,
 	)
+	if tokenId != nil {
+		rpcInvoice.Symbol, _ = r.GetSymbolWithTokenId(tokenId)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -3784,9 +3880,15 @@ func (r *rpcServer) ListInvoices(ctx context.Context,
 		LastIndexOffset:  invoiceSlice.LastIndexOffset,
 	}
 	for i, invoice := range invoiceSlice.Invoices {
-		resp.Invoices[i], err = invoicesrpc.CreateRPCInvoice(
+		var tokenId *wire.TokenId
+		resp.Invoices[i], tokenId, err = invoicesrpc.CreateRPCInvoice(
 			&invoice, activeNetParams.Params,
 		)
+
+		if tokenId != nil {
+			resp.Invoices[i].Symbol, _ = r.GetSymbolWithTokenId(tokenId)
+		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -3808,7 +3910,7 @@ func (r *rpcServer) SubscribeInvoices(req *lnrpc.InvoiceSubscription,
 	for {
 		select {
 		case newInvoice := <-invoiceClient.NewInvoices:
-			rpcInvoice, err := invoicesrpc.CreateRPCInvoice(
+			rpcInvoice, _, err := invoicesrpc.CreateRPCInvoice(
 				newInvoice, activeNetParams.Params,
 			)
 			if err != nil {
@@ -3820,7 +3922,7 @@ func (r *rpcServer) SubscribeInvoices(req *lnrpc.InvoiceSubscription,
 			}
 
 		case settledInvoice := <-invoiceClient.SettledInvoices:
-			rpcInvoice, err := invoicesrpc.CreateRPCInvoice(
+			rpcInvoice, _, err := invoicesrpc.CreateRPCInvoice(
 				settledInvoice, activeNetParams.Params,
 			)
 			if err != nil {
@@ -4175,6 +4277,7 @@ func unmarshallHopByChannelLookup(graph *channeldb.ChannelGraph, hop *lnrpc.Hop,
 		AmtToForward:     lnwire.MilliSatoshi(hop.AmtToForwardMsat),
 		PubKeyBytes:      pubKeyBytes,
 		ChannelID:        edgeInfo.ChannelID,
+		TokenAmtToForward:lnwire.MilliSatoshi(hop.TokenAmtToForwardMsat),
 	}, nil
 }
 
@@ -4195,6 +4298,7 @@ func unmarshallKnownPubkeyHop(hop *lnrpc.Hop) (*routing.Hop, error) {
 		AmtToForward:     lnwire.MilliSatoshi(hop.AmtToForwardMsat),
 		PubKeyBytes:      pubKeyBytes,
 		ChannelID:        hop.ChanId,
+		TokenAmtToForward:lnwire.MilliSatoshi(hop.TokenAmtToForwardMsat),
 	}, nil
 }
 
@@ -4239,13 +4343,21 @@ func unmarshallRoute(rpcroute *lnrpc.Route,
 		prevNodePubKey = routeHop.PubKeyBytes
 	}
 
-	// TTODO use right tokenId
+	tokenId := wire.TokenId{}
+	if rpcroute.TokenId != "" {
+		if t, err := wire.NewTokenIdFromStr(rpcroute.TokenId); err != nil {
+			return nil, err
+		} else {
+			tokenId.SetBytes(t[:])
+		}
+	}
+
 	route, err := routing.NewRouteFromHops(
 		lnwire.MilliSatoshi(rpcroute.TotalAmtMsat),
 		rpcroute.TotalTimeLock,
 		sourceNode.PubKeyBytes,
 		hops,
-		wire.EmptyTokenId, lnwire.MilliSatoshi(rpcroute.TotalTokenMsat),
+		tokenId, lnwire.MilliSatoshi(rpcroute.TotalTokenMsat),
 	)
 	if err != nil {
 		return nil, err
@@ -4525,6 +4637,9 @@ func (r *rpcServer) ListPayments(ctx context.Context,
 		msatValue := int64(payment.Terms.Value)
 		satValue := int64(payment.Terms.Value.ToSatoshis())
 
+		tokenMsatValue := int64(payment.Terms.TokenValue)
+		tokenSatValue := int64(payment.Terms.TokenValue.ToSatoshis())
+
 		paymentHash := sha256.Sum256(payment.PaymentPreimage[:])
 		paymentsResp.Payments[i] = &lnrpc.Payment{
 			PaymentHash:     hex.EncodeToString(paymentHash[:]),
@@ -4535,6 +4650,8 @@ func (r *rpcServer) ListPayments(ctx context.Context,
 			Path:            path,
 			Fee:             int64(payment.Fee.ToSatoshis()),
 			PaymentPreimage: hex.EncodeToString(payment.PaymentPreimage[:]),
+			TokenValueMsat:  tokenMsatValue,
+			TokenValueSat: 	 tokenSatValue,
 		}
 	}
 
@@ -4624,8 +4741,12 @@ func (r *rpcServer) DecodePayReq(ctx context.Context,
 		amt = int64(payReq.MilliSat.ToSatoshis())
 	}
 	tokenId := ""
+	tokenAmt := int64(0)
 	if payReq.TokenId != nil && payReq.TokenId.IsValid() {
 		tokenId = payReq.TokenId.ToString()
+		if payReq.TokenMilliSat != nil {
+			tokenAmt = int64(payReq.TokenMilliSat.ToSatoshis())
+		}
 	}
 
 	dest := payReq.Destination.SerializeCompressed()
@@ -4641,6 +4762,7 @@ func (r *rpcServer) DecodePayReq(ctx context.Context,
 		CltvExpiry:      int64(payReq.MinFinalCLTVExpiry()),
 		RouteHints:      routeHints,
 		TokenId:         tokenId,
+		TokenNumSatoshis:tokenAmt,
 	}, nil
 }
 

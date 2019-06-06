@@ -2,7 +2,6 @@ package routing
 
 import (
 	"fmt"
-	"github.com/btcsuite/btcd/wire"
 	"time"
 
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -156,8 +155,7 @@ func (p *paymentSession) RequestRoute(payment *LightningPayment,
 		},
 		p.mc.selfNode.PubKeyBytes, payment.Target,
 		payment.Amount,
-		// TTODO token data should  params
-		lnwire.NewMSatFromSatoshis(0), &wire.EmptyTokenId,
+		payment.TokenAmount, &payment.TokenId,
 	)
 	if err != nil {
 		return nil, err

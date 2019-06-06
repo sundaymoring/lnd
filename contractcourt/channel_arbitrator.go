@@ -165,6 +165,10 @@ type ContractReport struct {
 	// RecoveredBalance is the total value that has been successfully swept
 	// back to the user's wallet.
 	RecoveredBalance btcutil.Amount
+
+	TokenAmount btcutil.Amount
+	LimboTokenBalance btcutil.Amount
+	RecoveredTokenBalance btcutil.Amount
 }
 
 // htlcSet represents the set of active HTLCs on a given commitment
@@ -480,6 +484,7 @@ func supplementSuccessResolver(r *htlcSuccessResolver,
 		)
 	}
 	r.htlcAmt = htlc.Amt
+	r.htlcTokenAmt = htlc.TokenAmt
 	return nil
 }
 
@@ -497,6 +502,7 @@ func supplementTimeoutResolver(r *htlcTimeoutResolver,
 		)
 	}
 	r.htlcAmt = htlc.Amt
+	r.htlcTokenAmt = htlc.TokenAmt
 	return nil
 }
 
@@ -1324,6 +1330,7 @@ func (c *ChannelArbitrator) prepContractResolutions(htlcActions ChainActionMap,
 					broadcastHeight: height,
 					payHash:         htlc.RHash,
 					htlcAmt:         htlc.Amt,
+					htlcTokenAmt:	 htlc.TokenAmt,
 					ResolverKit:     resKit,
 				}
 				htlcResolvers = append(htlcResolvers, resolver)
@@ -1352,6 +1359,7 @@ func (c *ChannelArbitrator) prepContractResolutions(htlcActions ChainActionMap,
 					broadcastHeight: height,
 					htlcIndex:       htlc.HtlcIndex,
 					htlcAmt:         htlc.Amt,
+					htlcTokenAmt:    htlc.TokenAmt,
 					ResolverKit:     resKit,
 				}
 				htlcResolvers = append(htlcResolvers, resolver)
@@ -1386,6 +1394,7 @@ func (c *ChannelArbitrator) prepContractResolutions(htlcActions ChainActionMap,
 						broadcastHeight: height,
 						payHash:         htlc.RHash,
 						htlcAmt:         htlc.Amt,
+						htlcTokenAmt: 	 htlc.TokenAmt,
 						ResolverKit:     resKit,
 					},
 				}
@@ -1417,6 +1426,7 @@ func (c *ChannelArbitrator) prepContractResolutions(htlcActions ChainActionMap,
 						broadcastHeight: height,
 						htlcIndex:       htlc.HtlcIndex,
 						htlcAmt:         htlc.Amt,
+						htlcTokenAmt:    htlc.TokenAmt,
 						ResolverKit:     resKit,
 					},
 				}

@@ -312,6 +312,10 @@ func (f *ForwardingInfo) encode(w io.Writer) error {
 		return err
 	}
 
+	if err := binary.Write(w, binary.BigEndian, f.TokenAmountToForward); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -476,6 +480,9 @@ func (f *ForwardingInfo) decode(r io.Reader) error {
 		return err
 	}
 
+	if err := binary.Read(r, binary.BigEndian, &f.TokenAmountToForward); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -726,7 +733,7 @@ func (i *mockInvoiceRegistry) LookupInvoice(rHash lntypes.Hash) (channeldb.Invoi
 }
 
 func (i *mockInvoiceRegistry) SettleInvoice(rhash lntypes.Hash,
-	amt lnwire.MilliSatoshi) error {
+	amt, tokenAmt lnwire.MilliSatoshi) error {
 
 	i.Lock()
 	defer i.Unlock()

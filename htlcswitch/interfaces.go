@@ -19,7 +19,7 @@ type InvoiceDatabase interface {
 
 	// SettleInvoice attempts to mark an invoice corresponding to the
 	// passed payment hash as fully settled.
-	SettleInvoice(payHash lntypes.Hash, paidAmount lnwire.MilliSatoshi) error
+	SettleInvoice(payHash lntypes.Hash, paidAmount, paidTokenAmount lnwire.MilliSatoshi) error
 
 	// CancelInvoice attempts to cancel the invoice corresponding to the
 	// passed payment hash.

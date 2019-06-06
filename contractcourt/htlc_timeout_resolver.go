@@ -43,7 +43,7 @@ type htlcTimeoutResolver struct {
 	// htlcAmt is the original amount of the htlc, not taking into
 	// account any fees that may have to be paid if it goes on chain.
 	htlcAmt lnwire.MilliSatoshi
-
+	htlcTokenAmt lnwire.MilliSatoshi
 	ResolverKit
 }
 

@@ -255,6 +255,7 @@ func (h *htlcOutgoingContestResolver) report() *ContractReport {
 	// No locking needed as these values are read-only.
 
 	finalAmt := h.htlcAmt.ToSatoshis()
+	finalTokenAmt := h.htlcTokenAmt.ToSatoshis()
 	if h.htlcResolution.SignedTimeoutTx != nil {
 		finalAmt = btcutil.Amount(
 			h.htlcResolution.SignedTimeoutTx.TxOut[0].Value,
@@ -265,8 +266,10 @@ func (h *htlcOutgoingContestResolver) report() *ContractReport {
 		Outpoint:       h.htlcResolution.ClaimOutpoint,
 		Incoming:       false,
 		Amount:         finalAmt,
+		TokenAmount:	finalTokenAmt,
 		MaturityHeight: h.htlcResolution.Expiry,
 		LimboBalance:   finalAmt,
+		LimboTokenBalance:finalTokenAmt,
 		Stage:          1,
 	}
 }

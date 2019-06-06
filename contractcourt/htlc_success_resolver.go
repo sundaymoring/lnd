@@ -54,6 +54,7 @@ type htlcSuccessResolver struct {
 	// htlcAmt is the original amount of the htlc, not taking into
 	// account any fees that may have to be paid if it goes on chain.
 	htlcAmt lnwire.MilliSatoshi
+	htlcTokenAmt lnwire.MilliSatoshi
 
 	ResolverKit
 }
@@ -180,7 +181,7 @@ func (h *htlcSuccessResolver) Resolve() (ContractResolver, error) {
 
 		// With the HTLC claimed, we can attempt to settle its
 		// corresponding invoice if we were the original destination.
-		err = h.SettleInvoice(h.payHash, h.htlcAmt)
+		err = h.SettleInvoice(h.payHash, h.htlcAmt, h.htlcTokenAmt)
 		if err != nil && err != channeldb.ErrInvoiceNotFound {
 			log.Errorf("Unable to settle invoice with payment "+
 				"hash %x: %v", h.payHash, err)
@@ -253,7 +254,7 @@ func (h *htlcSuccessResolver) Resolve() (ContractResolver, error) {
 
 	// With the HTLC claimed, we can attempt to settle its corresponding
 	// invoice if we were the original destination.
-	err = h.SettleInvoice(h.payHash, h.htlcAmt)
+	err = h.SettleInvoice(h.payHash, h.htlcAmt, h.htlcTokenAmt)
 	if err != nil && err != channeldb.ErrInvoiceNotFound {
 		log.Errorf("Unable to settle invoice with payment "+
 			"hash %x: %v", h.payHash, err)

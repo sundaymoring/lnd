@@ -3,6 +3,7 @@ package invoicesrpc
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -13,12 +14,12 @@ import (
 
 // CreateRPCInvoice creates an *lnrpc.Invoice from the *channeldb.Invoice.
 func CreateRPCInvoice(invoice *channeldb.Invoice,
-	activeNetParams *chaincfg.Params) (*lnrpc.Invoice, error) {
+	activeNetParams *chaincfg.Params) (*lnrpc.Invoice, *wire.TokenId, error) {
 
 	paymentRequest := string(invoice.PaymentRequest)
 	decoded, err := zpay32.Decode(paymentRequest, activeNetParams)
 	if err != nil {
-		return nil, fmt.Errorf("unable to decode payment request: %v",
+		return nil, nil, fmt.Errorf("unable to decode payment request: %v",
 			err)
 	}
 
@@ -51,6 +52,9 @@ func CreateRPCInvoice(invoice *channeldb.Invoice,
 	satAmt := invoice.Terms.Value.ToSatoshis()
 	satAmtPaid := invoice.AmtPaid.ToSatoshis()
 
+	tokenSatAmt := invoice.Terms.TokenValue.ToSatoshis()
+	tokenSatAmtPaid := invoice.AmtPaid.ToSatoshis()
+
 	isSettled := invoice.Terms.State == channeldb.ContractSettled
 
 	var state lnrpc.Invoice_InvoiceState
@@ -62,11 +66,11 @@ func CreateRPCInvoice(invoice *channeldb.Invoice,
 	case channeldb.ContractCanceled:
 		state = lnrpc.Invoice_CANCELED
 	default:
-		return nil, fmt.Errorf("unknown invoice state %v",
+		return nil, nil, fmt.Errorf("unknown invoice state %v",
 			invoice.Terms.State)
 	}
 
-	return &lnrpc.Invoice{
+	inv := &lnrpc.Invoice{
 		Memo:            string(invoice.Memo[:]),
 		Receipt:         invoice.Receipt[:],
 		RHash:           decoded.PaymentHash[:],
@@ -88,7 +92,15 @@ func CreateRPCInvoice(invoice *channeldb.Invoice,
 		AmtPaidMsat:     int64(invoice.AmtPaid),
 		AmtPaid:         int64(invoice.AmtPaid),
 		State:           state,
-	}, nil
+	}
+
+	if decoded.TokenId != nil && decoded.TokenId.IsValid() {
+		inv.TokenValue = int64(tokenSatAmt)
+		inv.TokenAmtPaidSat = int64(tokenSatAmtPaid)
+		inv.TokenAmtPaidMsat =  int64(invoice.TokenAmtPaid)
+	}
+
+	return inv, decoded.TokenId, nil
 }
 
 // CreateRPCRouteHints takes in the decoded form of an invoice's route hints

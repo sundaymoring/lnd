@@ -157,6 +157,7 @@ type Invoice struct {
 	RouteHints [][]routing.HopHint
 
 	TokenId *wire.TokenId
+	TokenMilliSat *lnwire.MilliSatoshi
 }
 
 // Amount is a functional option that allows callers of NewInvoice to set the
@@ -164,6 +165,12 @@ type Invoice struct {
 func Amount(milliSat lnwire.MilliSatoshi) func(*Invoice) {
 	return func(i *Invoice) {
 		i.MilliSat = &milliSat
+	}
+}
+
+func TokenAmount(milliSat lnwire.MilliSatoshi) func(*Invoice) {
+	return func(i *Invoice) {
+		i.TokenMilliSat = &milliSat
 	}
 }
 
@@ -295,11 +302,22 @@ func Decode(invoice string, net *chaincfg.Params) (*Invoice, error) {
 	// prefix, we try to decode this as the payment amount.
 	var netPrefixLength = len(net.Bech32HRPSegwit) + 2
 	if len(hrp) > netPrefixLength {
-		amount, err := decodeAmount(hrp[netPrefixLength:])
-		if err != nil {
-			return nil, err
+		amounts := strings.Split(hrp[netPrefixLength:], "t")
+		if len(amounts[0]) > 0 {
+			amount, err := decodeAmount(amounts[0])
+			if err != nil {
+				return nil, err
+			}
+			decodedInvoice.MilliSat = &amount
 		}
-		decodedInvoice.MilliSat = &amount
+
+		if len(amounts) == 2 && len(amounts[1]) > 0 {
+			amount, err := decodeAmount(amounts[1])
+			if err != nil {
+				return nil, err
+			}
+			decodedInvoice.TokenMilliSat = &amount
+		}
 	}
 
 	// Everything except the last 520 bits of the data encodes the invoice's
@@ -417,6 +435,15 @@ func (invoice *Invoice) Encode(signer MessageSigner) (string, error) {
 		hrp += am
 	}
 
+	if invoice.TokenMilliSat != nil && *invoice.TokenMilliSat > 0 {
+		// Encode the amount using the fewest possible characters.
+		am, err := encodeAmount(*invoice.TokenMilliSat)
+		if err != nil {
+			return "", err
+		}
+		hrp = hrp + "t" + am
+	}
+
 	// The signature is over the single SHA-256 hash of the hrp + the
 	// tagged fields encoded in base256.
 	taggedFieldsBytes, err := bech32.ConvertBits(bufferBase32.Bytes(), 5, 8, true)
@@ -504,8 +531,9 @@ func validateInvoice(invoice *Invoice) error {
 	}
 
 	// Ensure that if there is an amount set, it is not negative.
-	if invoice.MilliSat != nil && *invoice.MilliSat < 0 {
-		return fmt.Errorf("negative amount: %v", *invoice.MilliSat)
+	if invoice.MilliSat != nil && *invoice.MilliSat < 0 ||
+		invoice.TokenMilliSat != nil && *invoice.TokenMilliSat < 0 {
+		return fmt.Errorf("negative amount: %v (token: %v)", *invoice.MilliSat, *invoice.TokenMilliSat)
 	}
 
 	// The invoice must contain a payment hash.

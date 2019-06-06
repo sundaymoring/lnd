@@ -204,6 +204,7 @@ func migrateInvoiceTimeSeries(tx *bbolt.Tx) error {
 			}
 
 			invoice.AmtPaid = invoice.Terms.Value
+			invoice.TokenAmtPaid = invoice.Terms.TokenValue
 
 			log.Tracef("Adding invoice (preimage=%x, "+
 				"settle_index=%v) to add time series",

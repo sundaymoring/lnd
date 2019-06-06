@@ -300,6 +300,13 @@ func convertToSecondLevelRevoke(bo *breachedOutput, breachInfo *retributionInfo,
 	newAmt := spendingTx.TxOut[0].Value
 	bo.amt = btcutil.Amount(newAmt)
 	bo.signDesc.Output.Value = newAmt
+	if spendingTx.TxOut[0].TokenId.IsValid() {
+		newTokenAmt := spendingTx.TxOut[0].TokenValue
+		bo.tokenAmt = btcutil.Amount(newTokenAmt)
+		bo.signDesc.Output.TokenValue = newTokenAmt
+		bo.signDesc.Output.TokenId.SetBytes(spendingTx.TxOut[0].TokenId[:])
+	}
+
 	bo.signDesc.Output.PkScript = spendingTx.TxOut[0].PkScript
 
 	// Finally, we'll need to adjust the witness program in the
@@ -762,6 +769,9 @@ type breachedOutput struct {
 	secondLevelWitnessScript []byte
 
 	witnessFunc input.WitnessGenerator
+
+	tokenId		wire.TokenId
+	tokenAmt    btcutil.Amount
 }
 
 // makeBreachedOutput assembles a new breachedOutput that can be used by the
@@ -774,7 +784,7 @@ func makeBreachedOutput(outpoint *wire.OutPoint,
 
 	amount := signDescriptor.Output.Value
 
-	return breachedOutput{
+	b := breachedOutput{
 		amt:                      btcutil.Amount(amount),
 		outpoint:                 *outpoint,
 		secondLevelWitnessScript: secondLevelScript,
@@ -782,11 +792,25 @@ func makeBreachedOutput(outpoint *wire.OutPoint,
 		signDesc:                 *signDescriptor,
 		confHeight:               confHeight,
 	}
+
+	if signDescriptor.Output.TokenId.IsValid() {
+		b.tokenAmt = btcutil.Amount(signDescriptor.Output.TokenValue)
+		b.tokenId.SetBytes(signDescriptor.Output.TokenId[:])
+	}
+	return b
 }
 
 // Amount returns the number of satoshis contained in the breached output.
 func (bo *breachedOutput) Amount() btcutil.Amount {
 	return bo.amt
+}
+
+func (bo *breachedOutput) TokenId() *wire.TokenId {
+	return &bo.tokenId
+}
+
+func (bo *breachedOutput) TokenAmount() btcutil.Amount {
+	return bo.tokenAmt
 }
 
 // OutPoint returns the breached output's identifier that is to be included as a
@@ -1450,6 +1474,16 @@ func (bo *breachedOutput) Encode(w io.Writer) error {
 		return err
 	}
 
+	err = wire.WriteVarBytes(w, 0, bo.tokenId[:])
+	if err != nil {
+		return err
+	}
+
+	binary.BigEndian.PutUint64(scratch[:8], uint64(bo.tokenAmt))
+	if _, err := w.Write(scratch[:8]); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1482,6 +1516,17 @@ func (bo *breachedOutput) Decode(r io.Reader) error {
 	bo.witnessType = input.WitnessType(
 		binary.BigEndian.Uint16(scratch[:2]),
 	)
+
+	tokenId, err := wire.ReadVarBytes(r, 0, 1000, "tokenid")
+	if err != nil {
+		return err
+	}
+	bo.tokenId.SetBytes(tokenId[:])
+
+	if _, err := io.ReadFull(r, scratch[:8]); err != nil {
+		return err
+	}
+	bo.tokenAmt = btcutil.Amount(binary.BigEndian.Uint64(scratch[:8]))
 
 	return nil
 }

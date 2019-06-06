@@ -190,6 +190,10 @@ func (s *Server) SendPayment(ctx context.Context,
 		return nil, fmt.Errorf("zero value invoices are not supported")
 	}
 
+	if payReq.TokenId.IsValid() && (payReq.TokenMilliSat == nil || payReq.TokenMilliSat <= 0) {
+		return nil, fmt.Errorf("zero token value invoices are not supported")
+	}
+
 	// Now that all the information we need has been parsed, we'll map this
 	// proto request into a proper request that our backing router can
 	// understand.
@@ -202,6 +206,11 @@ func (s *Server) SendPayment(ctx context.Context,
 		FinalCLTVDelta:    &finalDelta,
 		PayAttemptTimeout: time.Second * time.Duration(req.TimeoutSeconds),
 		RouteHints:        payReq.RouteHints,
+	}
+
+	if payReq.TokenId.IsValid() {
+		payment.TokenId.SetBytes(payReq.TokenId[:])
+		payment.TokenAmount = *payReq.TokenMilliSat
 	}
 
 	// Pin to an outgoing channel if specified.

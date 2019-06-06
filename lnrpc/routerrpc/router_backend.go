@@ -24,7 +24,7 @@ type RouterBackend struct {
 
 	// FetchChannelCapacity is a closure that we'll use the fetch the total
 	// capacity of a channel to populate in responses.
-	FetchChannelCapacity func(chanID uint64) (btcutil.Amount, error)
+	FetchChannelCapacity func(chanID uint64) (btcutil.Amount, btcutil.Amount, error)
 
 	// FindRoutes is a closure that abstracts away how we locate/query for
 	// routes.
@@ -219,18 +219,20 @@ func (r *RouterBackend) MarshallRoute(route *routing.Route) *lnrpc.Route {
 		Hops:          make([]*lnrpc.Hop, len(route.Hops)),
 	}
 	incomingAmt := route.TotalAmount
+	incomingTokenAmt := route.TotalTokenAmount
 	for i, hop := range route.Hops {
 		fee := route.HopFee(i)
 
 		// Channel capacity is not a defining property of a route. For
 		// backwards RPC compatibility, we retrieve it here from the
 		// graph.
-		chanCapacity, err := r.FetchChannelCapacity(hop.ChannelID)
+		chanCapacity, chanTokenCapacity, err := r.FetchChannelCapacity(hop.ChannelID)
 		if err != nil {
 			// If capacity cannot be retrieved, this may be a
 			// not-yet-received or private channel. Then report
 			// amount that is sent through the channel as capacity.
 			chanCapacity = incomingAmt.ToSatoshis()
+			chanTokenCapacity = incomingTokenAmt.ToSatoshis()
 		}
 
 		resp.Hops[i] = &lnrpc.Hop{
@@ -244,8 +246,11 @@ func (r *RouterBackend) MarshallRoute(route *routing.Route) *lnrpc.Route {
 			PubKey: hex.EncodeToString(
 				hop.PubKeyBytes[:],
 			),
+			ChanTokenCapacity:     int64(chanTokenCapacity),
+			TokenAmtToForwardMsat: int64(hop.TokenAmtToForward),
 		}
 		incomingAmt = hop.AmtToForward
+		incomingTokenAmt = hop.TokenAmtToForward
 	}
 
 	return resp

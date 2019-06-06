@@ -125,7 +125,7 @@ type ContractTerm struct {
 	// Value is the expected amount of milli-satoshis to be paid to an HTLC
 	// which can be satisfied by the above preimage.
 	Value lnwire.MilliSatoshi
-
+	TokenValue lnwire.MilliSatoshi
 	// State describes the state the invoice is in.
 	State ContractState
 }
@@ -193,6 +193,7 @@ type Invoice struct {
 	// that the invoice originally didn't specify an amount, or the sender
 	// overpaid.
 	AmtPaid lnwire.MilliSatoshi
+	TokenAmtPaid lnwire.MilliSatoshi
 }
 
 func validateInvoice(i *Invoice) error {
@@ -613,7 +614,7 @@ func (d *DB) QueryInvoices(q InvoiceQuery) (InvoiceSlice, error) {
 // hash doesn't existing within the database, then the action will fail with a
 // "not found" error.
 func (d *DB) SettleInvoice(paymentHash [32]byte,
-	amtPaid lnwire.MilliSatoshi) (*Invoice, error) {
+	amtPaid, tokenAmtPaid lnwire.MilliSatoshi) (*Invoice, error) {
 
 	var settledInvoice *Invoice
 	err := d.Update(func(tx *bbolt.Tx) error {
@@ -642,7 +643,7 @@ func (d *DB) SettleInvoice(paymentHash [32]byte,
 		}
 
 		settledInvoice, err = settleInvoice(
-			invoices, settleIndex, invoiceNum, amtPaid,
+			invoices, settleIndex, invoiceNum, amtPaid, tokenAmtPaid,
 		)
 
 		return err
@@ -839,6 +840,10 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 	if _, err := w.Write(scratch[:]); err != nil {
 		return err
 	}
+	byteOrder.PutUint64(scratch[:], uint64(i.Terms.TokenValue))
+	if _, err := w.Write(scratch[:]); err != nil {
+		return err
+	}
 
 	if err := binary.Write(w, byteOrder, i.Terms.State); err != nil {
 		return err
@@ -851,6 +856,9 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 		return err
 	}
 	if err := binary.Write(w, byteOrder, int64(i.AmtPaid)); err != nil {
+		return err
+	}
+	if err := binary.Write(w, byteOrder, int64(i.TokenAmtPaid)); err != nil {
 		return err
 	}
 
@@ -912,6 +920,11 @@ func deserializeInvoice(r io.Reader) (Invoice, error) {
 	}
 	invoice.Terms.Value = lnwire.MilliSatoshi(byteOrder.Uint64(scratch[:]))
 
+	if _, err := io.ReadFull(r, scratch[:]); err != nil {
+		return invoice, err
+	}
+	invoice.Terms.TokenValue = lnwire.MilliSatoshi(byteOrder.Uint64(scratch[:]))
+
 	if err := binary.Read(r, byteOrder, &invoice.Terms.State); err != nil {
 		return invoice, err
 	}
@@ -925,12 +938,15 @@ func deserializeInvoice(r io.Reader) (Invoice, error) {
 	if err := binary.Read(r, byteOrder, &invoice.AmtPaid); err != nil {
 		return invoice, err
 	}
+	if err := binary.Read(r, byteOrder, &invoice.TokenAmtPaid); err != nil {
+		return invoice, err
+	}
 
 	return invoice, nil
 }
 
 func settleInvoice(invoices, settleIndex *bbolt.Bucket, invoiceNum []byte,
-	amtPaid lnwire.MilliSatoshi) (*Invoice, error) {
+	amtPaid, tokenAmtPaid lnwire.MilliSatoshi) (*Invoice, error) {
 
 	invoice, err := fetchInvoice(invoiceNum, invoices)
 	if err != nil {
@@ -959,6 +975,7 @@ func settleInvoice(invoices, settleIndex *bbolt.Bucket, invoiceNum []byte,
 	}
 
 	invoice.AmtPaid = amtPaid
+	invoice.TokenAmtPaid = tokenAmtPaid
 	invoice.Terms.State = ContractSettled
 	invoice.SettleDate = time.Now()
 	invoice.SettleIndex = nextSettleSeqNo

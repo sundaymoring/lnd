@@ -140,7 +140,7 @@ type ChainArbitratorConfig struct {
 	// SettleInvoice attempts to settle an existing invoice on-chain with
 	// the given payment hash. ErrInvoiceNotFound is returned if an invoice
 	// is not found.
-	SettleInvoice func(lntypes.Hash, lnwire.MilliSatoshi) error
+	SettleInvoice func(lntypes.Hash, lnwire.MilliSatoshi, lnwire.MilliSatoshi) error
 
 	// NotifyClosedChannel is a function closure that the ChainArbitrator
 	// will use to notify the ChannelNotifier about a newly closed channel.

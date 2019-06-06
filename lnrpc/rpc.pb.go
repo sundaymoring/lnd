@@ -957,6 +957,8 @@ type SendRequest struct {
 	// The channel id of the channel that must be taken to the first hop. If zero,
 	// any channel may be used.
 	OutgoingChanId       uint64   `protobuf:"varint,9,opt,name=outgoing_chan_id,json=outgoingChanId,proto3" json:"outgoing_chan_id,omitempty"`
+	Symbol		 		 string   `protobuf:"bytes,10,opt,name=symbol,json=symbol,proto3" json:"symbol,omitempty"`
+	TokenAmt 			 int64 	  `protobuf:"varint,11,opt,name=token_amt,proto3" json:"token_amt,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -1003,6 +1005,20 @@ func (m *SendRequest) GetDestString() string {
 func (m *SendRequest) GetAmt() int64 {
 	if m != nil {
 		return m.Amt
+	}
+	return 0
+}
+
+func (m *SendRequest) GetSymbol() string {
+	if m != nil {
+		return m.Symbol
+	}
+	return ""
+}
+
+func (m *SendRequest) GetTokenAmt() int64 {
+	if m != nil {
+		return m.TokenAmt
 	}
 	return 0
 }
@@ -3854,6 +3870,7 @@ type PendingHTLC struct {
 	BlocksTilMaturity int32 `protobuf:"varint,5,opt,name=blocks_til_maturity,proto3" json:"blocks_til_maturity,omitempty"`
 	// / Indicates whether the htlc is in its first or second stage of recovery
 	Stage                uint32   `protobuf:"varint,6,opt,name=stage,proto3" json:"stage,omitempty"`
+	TokenAmount int64 `protobuf:"varint,7,opt,name=token_amount,proto3" json:"token_amount,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -3966,6 +3983,7 @@ type PendingChannelsResponse struct {
 	PendingForceClosingChannels []*PendingChannelsResponse_ForceClosedChannel `protobuf:"bytes,4,rep,name=pending_force_closing_channels,proto3" json:"pending_force_closing_channels,omitempty"`
 	// / Channels waiting for closing tx to confirm
 	WaitingCloseChannels []*PendingChannelsResponse_WaitingCloseChannel `protobuf:"bytes,5,rep,name=waiting_close_channels,proto3" json:"waiting_close_channels,omitempty"`
+	TotalLimboTokenBalance int64 `protobuf:"varint,1,opt,name=total_limbo_token_balance,proto3" json:"total_limbo_token_balance,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                       `json:"-"`
 	XXX_unrecognized     []byte                                         `json:"-"`
 	XXX_sizecache        int32                                          `json:"-"`
@@ -3998,6 +4016,13 @@ var xxx_messageInfo_PendingChannelsResponse proto.InternalMessageInfo
 func (m *PendingChannelsResponse) GetTotalLimboBalance() int64 {
 	if m != nil {
 		return m.TotalLimboBalance
+	}
+	return 0
+}
+
+func (m *PendingChannelsResponse) GetTotalLimboTokenBalance() int64 {
+	if m != nil {
+		return m.TotalLimboTokenBalance
 	}
 	return 0
 }
@@ -4036,6 +4061,9 @@ type PendingChannelsResponse_PendingChannel struct {
 	Capacity             int64    `protobuf:"varint,3,opt,name=capacity,proto3" json:"capacity,omitempty"`
 	LocalBalance         int64    `protobuf:"varint,4,opt,name=local_balance,proto3" json:"local_balance,omitempty"`
 	RemoteBalance        int64    `protobuf:"varint,5,opt,name=remote_balance,proto3" json:"remote_balance,omitempty"`
+	TokenCapacity        int64    `protobuf:"varint,6,opt,name=token_capacity,proto3" json:"token_capacity,omitempty"`
+	LocalTokenBalance    int64    `protobuf:"varint,7,opt,name=local_token_balance,proto3" json:"local_token_balance,omitempty"`
+	RemoteTokenBalance   int64    `protobuf:"varint,8,opt,name=remote_token_balance,proto3" json:"remote_token_balance,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -4088,6 +4116,14 @@ func (m *PendingChannelsResponse_PendingChannel) GetCapacity() int64 {
 	return 0
 }
 
+func (m *PendingChannelsResponse_PendingChannel) GetTokenCapacity() int64 {
+	if m != nil {
+		return m.TokenCapacity
+	}
+	return 0
+}
+
+
 func (m *PendingChannelsResponse_PendingChannel) GetLocalBalance() int64 {
 	if m != nil {
 		return m.LocalBalance
@@ -4098,6 +4134,20 @@ func (m *PendingChannelsResponse_PendingChannel) GetLocalBalance() int64 {
 func (m *PendingChannelsResponse_PendingChannel) GetRemoteBalance() int64 {
 	if m != nil {
 		return m.RemoteBalance
+	}
+	return 0
+}
+
+func (m *PendingChannelsResponse_PendingChannel) GetLocalTokenBalance() int64 {
+	if m != nil {
+		return m.LocalTokenBalance
+	}
+	return 0
+}
+
+func (m *PendingChannelsResponse_PendingChannel) GetRemoteTokenBalance() int64 {
+	if m != nil {
+		return m.RemoteTokenBalance
 	}
 	return 0
 }
@@ -4194,6 +4244,7 @@ type PendingChannelsResponse_WaitingCloseChannel struct {
 	Channel *PendingChannelsResponse_PendingChannel `protobuf:"bytes,1,opt,name=channel,proto3" json:"channel,omitempty"`
 	// / The balance in satoshis encumbered in this channel
 	LimboBalance         int64    `protobuf:"varint,2,opt,name=limbo_balance,proto3" json:"limbo_balance,omitempty"`
+	LimboTokenBalance         int64    `protobuf:"varint,3,opt,name=limbo_token_balance,proto3" json:"limbo_token_balance,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -4237,6 +4288,13 @@ func (m *PendingChannelsResponse_WaitingCloseChannel) GetChannel() *PendingChann
 func (m *PendingChannelsResponse_WaitingCloseChannel) GetLimboBalance() int64 {
 	if m != nil {
 		return m.LimboBalance
+	}
+	return 0
+}
+
+func (m *PendingChannelsResponse_WaitingCloseChannel) GetLimboTokenBalance() int64 {
+	if m != nil {
+		return m.LimboTokenBalance
 	}
 	return 0
 }
@@ -4306,6 +4364,8 @@ type PendingChannelsResponse_ForceClosedChannel struct {
 	// / The total value of funds successfully recovered from this channel
 	RecoveredBalance     int64          `protobuf:"varint,6,opt,name=recovered_balance,proto3" json:"recovered_balance,omitempty"`
 	PendingHtlcs         []*PendingHTLC `protobuf:"bytes,8,rep,name=pending_htlcs,proto3" json:"pending_htlcs,omitempty"`
+	LimboTokenBalance int64 			`protobuf:"varint,9,opt,name=limbo_token_balance,proto3" json:"limbo_token_balance,omitempty"`
+	RecoveredTokenBalance     int64     `protobuf:"varint,10,opt,name=recovered_token_balance,proto3" json:"recovered_token_balance,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
@@ -4360,6 +4420,13 @@ func (m *PendingChannelsResponse_ForceClosedChannel) GetLimboBalance() int64 {
 	return 0
 }
 
+func (m *PendingChannelsResponse_ForceClosedChannel) GetLimboTokenBalance() int64 {
+	if m != nil {
+		return m.LimboTokenBalance
+	}
+	return 0
+}
+
 func (m *PendingChannelsResponse_ForceClosedChannel) GetMaturityHeight() uint32 {
 	if m != nil {
 		return m.MaturityHeight
@@ -4377,6 +4444,13 @@ func (m *PendingChannelsResponse_ForceClosedChannel) GetBlocksTilMaturity() int3
 func (m *PendingChannelsResponse_ForceClosedChannel) GetRecoveredBalance() int64 {
 	if m != nil {
 		return m.RecoveredBalance
+	}
+	return 0
+}
+
+func (m *PendingChannelsResponse_ForceClosedChannel) GetRecoveredTokenBalance() int64 {
+	if m != nil {
+		return m.RecoveredTokenBalance
 	}
 	return 0
 }
@@ -5093,6 +5167,9 @@ type Hop struct {
 	// An optional public key of the hop. If the public key is given, the payment
 	// can be executed without relying on a copy of the channel graph.
 	PubKey               string   `protobuf:"bytes,8,opt,name=pub_key,proto3" json:"pub_key,omitempty"`
+
+	ChanTokenCapacity     int64  `protobuf:"varint,9,opt,name=chan_token_capacity,proto3" json:"chan_token_capacity,omitempty"`
+	TokenAmtToForwardMsat int64  `protobuf:"varint,10,opt,name=token_amt_to_forward_msat,proto3" json:"token_amt_to_forward_msat,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -5136,6 +5213,13 @@ func (m *Hop) GetChanCapacity() int64 {
 	return 0
 }
 
+func (m *Hop) GetChanTokenCapacity() int64 {
+	if m != nil {
+		return m.ChanTokenCapacity
+	}
+	return 0
+}
+
 // Deprecated: Do not use.
 func (m *Hop) GetAmtToForward() int64 {
 	if m != nil {
@@ -5162,6 +5246,13 @@ func (m *Hop) GetExpiry() uint32 {
 func (m *Hop) GetAmtToForwardMsat() int64 {
 	if m != nil {
 		return m.AmtToForwardMsat
+	}
+	return 0
+}
+
+func (m *Hop) GetTokenAmtToForwardMsat() int64 {
+	if m != nil {
+		return m.TokenAmtToForwardMsat
 	}
 	return 0
 }
@@ -6512,6 +6603,9 @@ type Invoice struct {
 
 	// /The token in invoice
 	Symbol string `protobuf:"bytes,21,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	TokenValue int64 `protobuf:"varint,22,opt,name=token_value,proto3" json:"value,omitempty"`
+	TokenAmtPaidSat int64 `protobuf:"varint,23,opt,name=token_amt_paid_sat,proto3" json:"token_amt_paid_sat,omitempty"`
+	TokenAmtPaidMsat int64 `protobuf:"varint,24,opt,name=token_amt_paid_msat,proto3" json:"token_amt_paid_msat,omitempty"`
 
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
@@ -6574,6 +6668,13 @@ func (m *Invoice) GetRHash() []byte {
 func (m *Invoice) GetValue() int64 {
 	if m != nil {
 		return m.Value
+	}
+	return 0
+}
+
+func (m *Invoice) GetTokenValue() int64 {
+	if m != nil {
+		return m.TokenValue
 	}
 	return 0
 }
@@ -7011,6 +7112,11 @@ type Payment struct {
 	ValueSat int64 `protobuf:"varint,7,opt,name=value_sat,proto3" json:"value_sat,omitempty"`
 	// / The value of the payment in milli-satoshis
 	ValueMsat            int64    `protobuf:"varint,8,opt,name=value_msat,proto3" json:"value_msat,omitempty"`
+
+
+	TokenValueSat int64 `protobuf:"varint,9,opt,name=token_value_sat,proto3" json:"token_value_sat,omitempty"`
+	TokenValueMsat int64 `protobuf:"varint,10,opt,name=token_value_msat,proto3" json:"token_value_msat,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -7093,6 +7199,20 @@ func (m *Payment) GetValueSat() int64 {
 func (m *Payment) GetValueMsat() int64 {
 	if m != nil {
 		return m.ValueMsat
+	}
+	return 0
+}
+
+func (m *Payment) GetTokenValueSat() int64 {
+	if m != nil {
+		return m.TokenValueSat
+	}
+	return 0
+}
+
+func (m *Payment) GetTokenValueMsat() int64 {
+	if m != nil {
+		return m.TokenValueMsat
 	}
 	return 0
 }
@@ -7429,6 +7549,7 @@ type PayReq struct {
 	CltvExpiry           int64        `protobuf:"varint,9,opt,name=cltv_expiry,proto3" json:"cltv_expiry,omitempty"`
 	RouteHints           []*RouteHint `protobuf:"bytes,10,rep,name=route_hints,proto3" json:"route_hints,omitempty"`
 	TokenId				 string		  `protobuf:"bytes,11,opt,name=token_id,proto3" json:"token_id,omitempty"`
+	TokenNumSatoshis          int64   `protobuf:"varint,12,opt,name=token_num_satoshis,proto3" json:"token_num_satoshis,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_unrecognized     []byte       `json:"-"`
 	XXX_sizecache        int32        `json:"-"`
@@ -7972,8 +8093,8 @@ type ForwardingEvent struct {
 	Fee uint64 `protobuf:"varint,7,opt,name=fee,proto3" json:"fee,omitempty"`
 	// / The total fee (in milli-satoshis) that this payment circuit carried.
 	FeeMsat              uint64   `protobuf:"varint,8,opt,name=fee_msat,proto3" json:"fee_msat,omitempty"`
-	TokenAmtIn uint64 `protobuf:"varint,8,opt,name=token_amt_in,proto3" json:"token_amt_in,omitempty"`
-	TokenAmtOut uint64 `protobuf:"varint,9,opt,name=token_amt_out,proto3" json:"token_amt_out,omitempty"`
+	TokenAmtIn uint64 `protobuf:"varint,9,opt,name=token_amt_in,proto3" json:"token_amt_in,omitempty"`
+	TokenAmtOut uint64 `protobuf:"varint,10,opt,name=token_amt_out,proto3" json:"token_amt_out,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
