@@ -4742,11 +4742,42 @@ func (m *ChannelBalanceRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ChannelBalanceRequest proto.InternalMessageInfo
 
+type ChannelTokenBalance struct {
+	Symbol				 string   `protobuf:"bytes,1,opt,name=symbol,json=symbol,proto3" json:"symbol,omitempty"`
+	TokenBalance 		 int64 `protobuf:"varint,2,opt,name=token_balance,proto3" json:"token_balance,omitempty"`
+	TokenPendingOpenBalance   int64    `protobuf:"varint,3,opt,name=token_pending_open_balance,proto3" json:"token_pending_open_balance,omitempty"`
+}
+
+func (m *ChannelTokenBalance) Reset()         { *m = ChannelTokenBalance{} }
+func (m *ChannelTokenBalance) String() string { return proto.CompactTextString(m) }
+func (*ChannelTokenBalance) ProtoMessage()    {}
+func (*ChannelTokenBalance) Descriptor() ([]byte, []int) {
+	return fileDescriptor_rpc_3ef4d8a7aac1a994, []int{115}
+}
+func (m *ChannelTokenBalance) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ChannelTokenBalance.Unmarshal(m, b)
+}
+func (m *ChannelTokenBalance) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ChannelTokenBalance.Marshal(b, m, deterministic)
+}
+func (dst *ChannelTokenBalance) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChannelTokenBalance.Merge(dst, src)
+}
+func (m *ChannelTokenBalance) XXX_Size() int {
+	return xxx_messageInfo_ChannelTokenBalance.Size(m)
+}
+func (m *ChannelTokenBalance) XXX_DiscardUnknown() {
+	xxx_messageInfo_ChannelTokenBalance.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ChannelTokenBalance proto.InternalMessageInfo
+
 type ChannelBalanceResponse struct {
 	// / Sum of channels balances denominated in satoshis
 	Balance int64 `protobuf:"varint,1,opt,name=balance,proto3" json:"balance,omitempty"`
 	// / Sum of channels pending balances denominated in satoshis
 	PendingOpenBalance   int64    `protobuf:"varint,2,opt,name=pending_open_balance,proto3" json:"pending_open_balance,omitempty"`
+	Tokens []*ChannelTokenBalance `protobuf:"bytes,3,rep,name=tokens,json=tokens,proto3" json:"tokens,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -8081,6 +8112,7 @@ func init() {
 	proto.RegisterType((*WalletBalanceRequest)(nil), "lnrpc.WalletBalanceRequest")
 	proto.RegisterType((*WalletBalanceResponse)(nil), "lnrpc.WalletBalanceResponse")
 	proto.RegisterType((*ChannelBalanceRequest)(nil), "lnrpc.ChannelBalanceRequest")
+	proto.RegisterType((*ChannelTokenBalance)(nil), "lnrpc.ChannelTokenBalance")
 	proto.RegisterType((*ChannelBalanceResponse)(nil), "lnrpc.ChannelBalanceResponse")
 	proto.RegisterType((*QueryRoutesRequest)(nil), "lnrpc.QueryRoutesRequest")
 	proto.RegisterType((*EdgeLocator)(nil), "lnrpc.EdgeLocator")
