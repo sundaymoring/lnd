@@ -292,6 +292,12 @@ type ChannelEdgeUpdate struct {
 	// Disabled, if true, signals that the channel is unavailable to relay
 	// payments.
 	Disabled bool
+
+	// for token
+	TokenId wire.TokenId
+	TokenCapacity btcutil.Amount
+	TokenMinHTLC lnwire.MilliSatoshi
+	TokenMaxHTLC lnwire.MilliSatoshi
 }
 
 // appendTopologyChange appends the passed update message to the passed
@@ -372,6 +378,12 @@ func addToTopologyChange(graph *channeldb.ChannelGraph, update *TopologyChange,
 		edgeUpdate.AdvertisingNode.Curve = nil
 		edgeUpdate.ConnectingNode.Curve = nil
 
+		if m.TokenId.IsValid() {
+			edgeUpdate.TokenId.SetBytes(m.TokenId[:])
+			edgeUpdate.TokenCapacity = edgeInfo.CapacityToken
+			edgeUpdate.TokenMinHTLC = m.TokenMinHTLC
+			edgeUpdate.TokenMaxHTLC = m.TokenMaxHTLC
+		}
 		// TODO(roasbeef): add bit to toggle
 		update.ChannelEdgeUpdates = append(update.ChannelEdgeUpdates,
 			edgeUpdate)

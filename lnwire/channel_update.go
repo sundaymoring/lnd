@@ -3,6 +3,7 @@ package lnwire
 import (
 	"bytes"
 	"fmt"
+	"github.com/btcsuite/btcd/wire"
 	"io"
 	"io/ioutil"
 
@@ -117,6 +118,11 @@ type ChannelUpdate struct {
 	// and ensure we're able to make upgrades to the network in a forwards
 	// compatible manner.
 	ExtraOpaqueData []byte
+
+	// for token
+	TokenId wire.TokenId
+	HtlcMinimumTokenMsat MilliSatoshi
+	HtlcMaximumTokenMsat MilliSatoshi
 }
 
 // A compile time check to ensure ChannelUpdate implements the lnwire.Message
@@ -139,6 +145,9 @@ func (a *ChannelUpdate) Decode(r io.Reader, pver uint32) error {
 		&a.HtlcMinimumMsat,
 		&a.BaseFee,
 		&a.FeeRate,
+		&a.TokenId,
+		&a.HtlcMinimumTokenMsat,
+		&a.HtlcMaximumTokenMsat,
 	)
 	if err != nil {
 		return err
@@ -182,6 +191,9 @@ func (a *ChannelUpdate) Encode(w io.Writer, pver uint32) error {
 		a.HtlcMinimumMsat,
 		a.BaseFee,
 		a.FeeRate,
+		a.TokenId,
+		a.HtlcMinimumTokenMsat,
+		a.HtlcMaximumTokenMsat,
 	)
 	if err != nil {
 		return err
@@ -231,6 +243,9 @@ func (a *ChannelUpdate) DataToSign() ([]byte, error) {
 		a.HtlcMinimumMsat,
 		a.BaseFee,
 		a.FeeRate,
+		a.TokenId,
+		a.HtlcMinimumTokenMsat,
+		a.HtlcMaximumTokenMsat,
 	)
 	if err != nil {
 		return nil, err

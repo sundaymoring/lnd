@@ -2939,6 +2939,15 @@ var queryRoutesCommand = cli.Command{
 			Usage: "(optional) number of blocks the last hop has to reveal " +
 				"the preimage",
 		},
+
+		cli.StringFlag{
+			Name: "symbol",
+			Usage: "(optional) the token in channel",
+		},
+		cli.Int64Flag{
+			Name:  "token_amt",
+			Usage: "(optional) the token amount to send expressed in satoshis",
+		},
 	},
 	Action: actionDecorator(queryRoutes),
 }
@@ -2951,6 +2960,8 @@ func queryRoutes(ctx *cli.Context) error {
 	var (
 		dest string
 		amt  int64
+		symbol string
+		tokenAmt int64
 		err  error
 	)
 
@@ -2978,6 +2989,13 @@ func queryRoutes(ctx *cli.Context) error {
 		return fmt.Errorf("amt argument missing")
 	}
 
+	if ctx.IsSet("symbol") {
+		symbol = ctx.String("symbol")
+		if ctx.IsSet("token_amt") {
+			tokenAmt = ctx.Int64("token_amt")
+		}
+	}
+
 	feeLimit, err := retrieveFeeLimit(ctx)
 	if err != nil {
 		return err
@@ -2989,6 +3007,8 @@ func queryRoutes(ctx *cli.Context) error {
 		FeeLimit:       feeLimit,
 		NumRoutes:      int32(ctx.Int("num_max_routes")),
 		FinalCltvDelta: int32(ctx.Int("final_cltv_delta")),
+		Symbol: 		symbol,
+		AmtToken: 		tokenAmt,
 	}
 
 	route, err := client.QueryRoutes(ctxb, req)

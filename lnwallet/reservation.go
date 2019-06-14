@@ -330,12 +330,12 @@ func (r *ChannelReservation) CommitConstraints(c *channeldb.ChannelConstraints) 
 		return ErrChanReserveTooLarge(c.ChanReserve, maxChanReserve)
 	}
 
-	if r.partialState.TokenId.IsValid() {
-		maxChanReserveToken := r.partialState.TokenCapacity / 5
-		if c.ChanReserve > maxChanReserveToken {
-			return ErrChanReserveTooLarge(c.ChanReserve, maxChanReserveToken)
-		}
-	}
+	//if r.partialState.TokenId.IsValid() {
+	//	maxChanReserveToken := r.partialState.TokenCapacity / 5
+	//	if c.ChanReserve > maxChanReserveToken {
+	//		return ErrChanReserveTooLarge(c.ChanReserve, maxChanReserveToken)
+	//	}
+	//}
 
 	// Fail if the minimum HTLC value is too large. If this is too large,
 	// the channel won't be useful for sending small payments. This limit

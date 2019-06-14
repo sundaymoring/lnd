@@ -336,6 +336,12 @@ func (c *ChanSeries) FetchChanUpdates(chain chainhash.Hash,
 			FeeRate:         uint32(e1.FeeProportionalMillionths),
 			ExtraOpaqueData: e1.ExtraOpaqueData,
 		}
+
+		if e1.TokenId.IsValid() {
+			chanUpdate.TokenId.SetBytes(e1.TokenId[:])
+			chanUpdate.HtlcMinimumTokenMsat = e1.TokenMinHTLC
+			chanUpdate.HtlcMaximumTokenMsat = e1.TokenMaxHTLC
+		}
 		chanUpdate.Signature, err = lnwire.NewSigFromRawSignature(e1.SigBytes)
 		if err != nil {
 			return nil, err
@@ -356,6 +362,11 @@ func (c *ChanSeries) FetchChanUpdates(chain chainhash.Hash,
 			BaseFee:         uint32(e2.FeeBaseMSat),
 			FeeRate:         uint32(e2.FeeProportionalMillionths),
 			ExtraOpaqueData: e2.ExtraOpaqueData,
+		}
+		if e2.TokenId.IsValid() {
+			chanUpdate.TokenId.SetBytes(e2.TokenId[:])
+			chanUpdate.HtlcMinimumTokenMsat = e2.TokenMinHTLC
+			chanUpdate.HtlcMaximumTokenMsat = e2.TokenMaxHTLC
 		}
 		chanUpdate.Signature, err = lnwire.NewSigFromRawSignature(e2.SigBytes)
 		if err != nil {

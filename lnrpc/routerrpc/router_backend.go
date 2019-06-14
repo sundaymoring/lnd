@@ -44,7 +44,7 @@ type RouterBackend struct {
 // TODO(roasbeef): should return a slice of routes in reality * create separate
 // PR to send based on well formatted route
 func (r *RouterBackend) QueryRoutes(ctx context.Context,
-	in *lnrpc.QueryRoutesRequest) (*lnrpc.QueryRoutesResponse, error) {
+	in *lnrpc.QueryRoutesRequest, tokenId *wire.TokenId) (*lnrpc.QueryRoutesResponse, error) {
 
 	parsePubKey := func(key string) (routing.Vertex, error) {
 		pubKeyBytes, err := hex.DecodeString(key)
@@ -90,11 +90,6 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 	if amtMSat > r.MaxPaymentMSat {
 		return nil, fmt.Errorf("payment of %v is too large, max payment "+
 			"allowed is %v", amt, r.MaxPaymentMSat.ToSatoshis())
-	}
-
-	tokenId, err := wire.NewTokenIdFromStr(in.TokenId)
-	if err != nil {
-		return nil, err
 	}
 
 	amtToken := btcutil.Amount(in.AmtToken)
@@ -149,6 +144,9 @@ func (r *RouterBackend) QueryRoutes(ctx context.Context,
 		findErr error
 	)
 
+	if tokenId == nil {
+		tokenId = &wire.EmptyTokenId
+	}
 	if in.FinalCltvDelta == 0 {
 		routes, findErr = r.FindRoutes(
 			sourcePubKey, targetPubKey, amtMSat, restrictions,
@@ -217,6 +215,9 @@ func (r *RouterBackend) MarshallRoute(route *routing.Route) *lnrpc.Route {
 		TotalAmt:      int64(route.TotalAmount.ToSatoshis()),
 		TotalAmtMsat:  int64(route.TotalAmount),
 		Hops:          make([]*lnrpc.Hop, len(route.Hops)),
+
+		TokenId:           route.TokenId.ToString(),
+		TotalTokenAmtMsat: int64(route.TotalTokenAmount),
 	}
 	incomingAmt := route.TotalAmount
 	incomingTokenAmt := route.TotalTokenAmount

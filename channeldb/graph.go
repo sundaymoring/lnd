@@ -555,7 +555,6 @@ func (c *ChannelGraph) addChannelEdge(tx *bbolt.Tx, edge *ChannelEdgeInfo) error
 	case node2Err != nil:
 		return err
 	}
-
 	// If the edge hasn't been created yet, then we'll first add it to the
 	// edge index in order to associate the edge between two nodes and also
 	// store the static components of the channel.
@@ -2474,7 +2473,7 @@ type ChannelEdgePolicy struct {
 	// for token
 	TokenId wire.TokenId
 	TokenMinHTLC lnwire.MilliSatoshi
-	//TokenMaxHTLC lnwire.MilliSatoshi	// do not consider tokenMaxHtlc
+	TokenMaxHTLC lnwire.MilliSatoshi	// do not consider tokenMaxHtlc
 }
 
 // Signature is a channel announcement signature, which is needed for proper
@@ -3402,6 +3401,9 @@ func serializeChanEdgePolicy(w io.Writer, edge *ChannelEdgePolicy,
 	if err := binary.Write(w, byteOrder, uint64(edge.TokenMinHTLC)); err != nil {
 		return err
 	}
+	if err := binary.Write(w, byteOrder, uint64(edge.TokenMaxHTLC)); err != nil {
+		return err
+	}
 
 	// If the max_htlc field is present, we write it. To be compatible with
 	// older versions that wasn't aware of this field, we write it as part
@@ -3498,6 +3500,11 @@ func deserializeChanEdgePolicy(r io.Reader,
 		return nil, err
 	}
 	edge.TokenMinHTLC = lnwire.MilliSatoshi(n)
+
+	if err := binary.Read(r, byteOrder, &n); err != nil {
+		return nil, err
+	}
+	edge.TokenMaxHTLC = lnwire.MilliSatoshi(n)
 
 	// We'll try and see if there are any opaque bytes left, if not, then
 	// we'll ignore the EOF error and return the edge as is.

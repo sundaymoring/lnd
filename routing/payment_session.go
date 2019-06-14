@@ -137,7 +137,6 @@ func (p *paymentSession) RequestRoute(payment *LightningPayment,
 		len(pruneView.vertexes))
 
 	// TODO(roasbeef): sync logic amongst dist sys
-
 	// Taking into account this prune view, we'll attempt to locate a path
 	// to our destination, respecting the recommendations from
 	// missionControl.

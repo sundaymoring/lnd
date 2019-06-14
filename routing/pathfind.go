@@ -458,7 +458,6 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		}
 		defer tx.Rollback()
 	}
-
 	// First we'll initialize an empty heap which'll help us to quickly
 	// locate the next edge we should visit next during our graph
 	// traversal.
@@ -577,6 +576,10 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			return
 		}
 
+		if tokenId != nil && tokenId.IsValid() &&
+			!edge.TokenId.IsEqual(tokenId) {
+			return
+		}
 
 		toNodeDist := distance[toNode]
 
@@ -597,16 +600,9 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			return
 		}
 
-		// for token restraint
-		if tokenIdEdge != edge.TokenId || tokenBandwidth < amountTokenToSend {
-			log.Info("taiyi debug: tokenIdEdge != edge.TokenId || tokenBandwidth < amountTokenToSend")
-			return
-		}
-
 		// If the amountToSend is less than the minimum required
 		// amount, return.
-		if amountToSend < edge.MinHTLC || amountTokenToSend < edge.TokenMinHTLC {
-			log.Info("taiyi debug: amountToSend < edge.MinHTLC || amountTokenToSend < edge.TokenMinHTLC")
+		if amountToSend < edge.MinHTLC {
 			return
 		}
 
@@ -614,9 +610,24 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 		// its max HTLC. Therefore, only consider discarding this edge here if
 		// the field is set.
 		if edge.MaxHTLC != 0 && edge.MaxHTLC < amountToSend {
-			// ||(edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend){
-			log.Info("taiyi debug: edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend")
 			return
+		}
+
+		// for token restraint
+		if tokenId != nil && tokenId.IsValid() {
+			if !tokenIdEdge.IsEqual(tokenId)|| !edge.TokenId.IsEqual(tokenId) ||
+				tokenBandwidth < amountTokenToSend {
+				log.Info("taiyi debug: tokenIdEdge != edge.TokenId || tokenBandwidth < amountTokenToSend")
+				return
+			}
+
+			if amountTokenToSend < edge.TokenMinHTLC {
+				log.Info("taiyi debug: amountToSend < edge.MinHTLC || amountTokenToSend < edge.TokenMinHTLC")
+			}
+
+			if edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend {
+				log.Info("taiyi debug: edge.TokenMaxHTLC != 0 && edge.TokenMaxHTLC < amountTokenToSend")
+			}
 		}
 
 		// Compute fee that fromNode is charging. It is based on the
@@ -734,7 +745,8 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 				return nil
 			}
 
-			if *tokenId != edgeInfo.TokenId {
+			if tokenId != nil && tokenId.IsValid() &&
+				!edgeInfo.TokenId.IsEqual(tokenId) {
 				log.Infof("taiyi debug: *tokenId != edgeInfo.TokenId")
 				return nil
 			}
@@ -764,7 +776,6 @@ func findPath(g *graphParams, r *RestrictParams, source, target Vertex,
 			if err != nil {
 				return err
 			}
-
 			// Check if this candidate node is better than what we
 			// already have.
 			processEdge(channelSource, inEdge, edgeBandwidth, edgeTokenBandwidth, pivot)

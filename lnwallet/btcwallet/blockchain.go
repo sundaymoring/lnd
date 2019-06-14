@@ -91,10 +91,23 @@ func (b *BtcWallet) GetUtxo(op *wire.OutPoint, pkScript []byte,
 			return nil, err
 		}
 
-		return &wire.TxOut{
+		tokenAmt, err := btcutil.NewAmount(txout.TokenValue)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenIdBytes, err := hex.DecodeString(txout.TokenId)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &wire.TxOut{
 			Value:    int64(amt),
 			PkScript: pkScript,
-		}, nil
+			TokenValue: int64(tokenAmt),
+		}
+		out.TokenId.SetBytes(tokenIdBytes)
+		return out, nil
 
 	case *chain.BitcoindClient:
 		txout, err := backend.GetTxOut(&op.Hash, op.Index, false)
@@ -116,11 +129,23 @@ func (b *BtcWallet) GetUtxo(op *wire.OutPoint, pkScript []byte,
 			return nil, err
 		}
 
-		return &wire.TxOut{
+		tokenAmt, err := btcutil.NewAmount(txout.TokenValue)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenId, err := wire.NewTokenIdFromStr(txout.TokenId)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &wire.TxOut{
 			Value:    int64(amt),
 			PkScript: pkScript,
-		}, nil
-
+			TokenValue: int64(tokenAmt),
+		}
+		out.TokenId.SetBytes(tokenId[:])
+		return out, nil
 	default:
 		return nil, fmt.Errorf("unknown backend")
 	}

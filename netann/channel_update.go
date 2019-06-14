@@ -130,6 +130,11 @@ func ChannelUpdateFromEdge(info *channeldb.ChannelEdgeInfo,
 		FeeRate:         uint32(policy.FeeProportionalMillionths),
 		ExtraOpaqueData: policy.ExtraOpaqueData,
 	}
+	if policy.TokenId.IsValid() {
+		update.TokenId.SetBytes(policy.TokenId[:])
+		update.HtlcMinimumTokenMsat = policy.TokenMinHTLC
+		update.HtlcMaximumTokenMsat = policy.TokenMaxHTLC
+	}
 
 	var err error
 	update.Signature, err = lnwire.NewSigFromRawSignature(policy.SigBytes)

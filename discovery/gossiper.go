@@ -1900,6 +1900,12 @@ func (d *AuthenticatedGossiper) processNetworkAnnouncement(
 			ExtraOpaqueData:           msg.ExtraOpaqueData,
 		}
 
+		if msg.TokenId.IsValid() {
+			update.TokenId.SetBytes(msg.TokenId[:])
+			update.TokenMinHTLC = msg.HtlcMinimumTokenMsat
+			update.TokenMaxHTLC = msg.HtlcMaximumTokenMsat
+		}
+
 		if err := d.cfg.Router.UpdateEdge(update); err != nil {
 			if routing.IsError(err, routing.ErrOutdated,
 				routing.ErrIgnored) {
@@ -2374,6 +2380,11 @@ func (d *AuthenticatedGossiper) updateChannel(info *channeldb.ChannelEdgeInfo,
 		ExtraOpaqueData: edge.ExtraOpaqueData,
 	}
 
+	if edge.TokenId.IsValid() {
+		chanUpdate.TokenId.SetBytes(edge.TokenId[:])
+		chanUpdate.HtlcMinimumTokenMsat = edge.TokenMinHTLC
+		chanUpdate.HtlcMaximumTokenMsat = edge.TokenMaxHTLC
+	}
 	var err error
 	chanUpdate.Signature, err = lnwire.NewSigFromRawSignature(edge.SigBytes)
 	if err != nil {

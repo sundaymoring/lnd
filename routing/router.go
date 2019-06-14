@@ -204,13 +204,15 @@ type routeTuple struct {
 	amt  lnwire.MilliSatoshi
 	dest [33]byte
 	tokenId wire.TokenId
+	tokenAmt lnwire.MilliSatoshi
 }
 
 // newRouteTuple creates a new route tuple from the target and amount.
 // HTODO modify code where call this functionsss
-func newRouteTuple(amt lnwire.MilliSatoshi, dest []byte, token []byte) routeTuple {
+func newRouteTuple(amt lnwire.MilliSatoshi, dest []byte, token []byte, tokenAmt lnwire.MilliSatoshi) routeTuple {
 	r := routeTuple{
 		amt: amt,
+		tokenAmt: tokenAmt,
 	}
 	copy(r.dest[:], dest)
 	copy(r.tokenId[:], token)
@@ -1065,6 +1067,7 @@ func (r *ChannelRouter) processUpdate(msg interface{}) error {
 				fundingPoint, fundingPkScript,
 				channelID.BlockHeight,
 			)
+
 			if err != nil {
 				r.rejectMtx.Lock()
 				r.rejectCache[msg.ChannelID] = struct{}{}
@@ -1350,7 +1353,7 @@ func (r *ChannelRouter) FindRoutes(source, target Vertex,
 	// TODO: Route cache should store all request parameters instead of just
 	// amt and target. Currently false positives are returned if just the
 	// restrictions (fee limit, ignore lists) or finalExpiry are different.
-	rt := newRouteTuple(amt, target[:], tokenId[:])
+	rt := newRouteTuple(amt, target[:], tokenId[:], amtToken)
 	r.routeCacheMtx.RLock()
 	routes, ok := r.routeCache[rt]
 	r.routeCacheMtx.RUnlock()
@@ -2056,7 +2059,8 @@ func (r *ChannelRouter) applyChannelUpdate(msg *lnwire.ChannelUpdate,
 		return false
 	}
 
-	err = r.UpdateEdge(&channeldb.ChannelEdgePolicy{
+
+	update := &channeldb.ChannelEdgePolicy{
 		SigBytes:                  msg.Signature.ToSignatureBytes(),
 		ChannelID:                 msg.ShortChannelID.ToUint64(),
 		LastUpdate:                time.Unix(int64(msg.Timestamp), 0),
@@ -2067,7 +2071,13 @@ func (r *ChannelRouter) applyChannelUpdate(msg *lnwire.ChannelUpdate,
 		MaxHTLC:                   msg.HtlcMaximumMsat,
 		FeeBaseMSat:               lnwire.MilliSatoshi(msg.BaseFee),
 		FeeProportionalMillionths: lnwire.MilliSatoshi(msg.FeeRate),
-	})
+	}
+	if msg.TokenId.IsValid() {
+		update.TokenId.SetBytes(msg.TokenId[:])
+		update.TokenMinHTLC = msg.HtlcMinimumTokenMsat
+		update.TokenMaxHTLC = msg.HtlcMaximumTokenMsat
+	}
+	err = r.UpdateEdge(update)
 	if err != nil && !IsError(err, ErrIgnored, ErrOutdated) {
 		log.Errorf("Unable to apply channel update: %v", err)
 		return false

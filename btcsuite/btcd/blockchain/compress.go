@@ -599,11 +599,11 @@ func decodeCompressedTxOut(serialized []byte) (uint64, []byte, []byte, uint64, i
 	tokenId := decompressScript(serialized[offset : offset+scriptSize])
 
 	offset += scriptSize
-	tokenAmount, bytesRead := deserializeVLQ(serialized[offset:])
+	compressTokenAmount, bytesRead := deserializeVLQ(serialized[offset:])
 	if bytesRead >= len(serialized[offset:]) {
 		return 0, nil, nil, 0, bytesRead, errDeserialize("unexpected end of " +
 			"data after compressed token amount")
 	}
-
+	tokenAmount := decompressTxOutAmount(compressTokenAmount)
 	return amount, script, tokenId, tokenAmount, offset + bytesRead, nil
 }

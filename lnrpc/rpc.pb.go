@@ -5007,8 +5007,9 @@ type QueryRoutesRequest struct {
 	XXX_sizecache        int32    `json:"-"`
 
 	// for token
-	AmtToken int64 `protobuf:"varint,9,opt,name=amtToken,proto3" json:"amtToken,omitempty"`
-	TokenId string	`protobuf:"bytes,10,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty`
+	Symbol string	`protobuf:"bytes,9,opt,name=symbol,json=symbol,proto3" json:"symbol,omitempty`
+	AmtToken int64 `protobuf:"varint,10,opt,name=amtToken,proto3" json:"amtToken,omitempty"`
+
 }
 
 func (m *QueryRoutesRequest) Reset()         { *m = QueryRoutesRequest{} }
@@ -5338,8 +5339,8 @@ type Route struct {
 	TotalAmtMsat         int64    `protobuf:"varint,6,opt,name=total_amt_msat,proto3" json:"total_amt_msat,omitempty"`
 
 	// for token
-	TotalTokenMsat		 int64	  `protobuf:"varint,7,opt,name=total_token_amt_msat,proto3" json:"total_token_amt_msat,omitempty"`
-	TokenId				 string	  `protobuf:"bytes,8,opt,name=token_id,proto3" json:"token_id,omitempty"`
+	TotalTokenAmtMsat int64  `protobuf:"varint,7,opt,name=total_token_amt_msat,proto3" json:"total_token_amt_msat,omitempty"`
+	TokenId           string `protobuf:"bytes,8,opt,name=token_id,proto3" json:"token_id,omitempty"`
 
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`

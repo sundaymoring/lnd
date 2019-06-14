@@ -53,7 +53,7 @@ func CreateRPCInvoice(invoice *channeldb.Invoice,
 	satAmtPaid := invoice.AmtPaid.ToSatoshis()
 
 	tokenSatAmt := invoice.Terms.TokenValue.ToSatoshis()
-	tokenSatAmtPaid := invoice.AmtPaid.ToSatoshis()
+	tokenSatAmtPaid := invoice.TokenAmtPaid.ToSatoshis()
 
 	isSettled := invoice.Terms.State == channeldb.ContractSettled
 

@@ -4,7 +4,9 @@
 
 package btcjson
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
@@ -290,6 +292,9 @@ type GetTxOutResult struct {
 	Value         float64            `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
 	Coinbase      bool               `json:"coinbase"`
+
+	TokenId		  string			 `json:"tokenId"`
+	TokenValue	  float64			 `json:"tokenValue"`
 }
 
 // GetNetTotalsResult models the data returned from the getnettotals command.

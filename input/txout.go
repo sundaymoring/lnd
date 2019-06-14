@@ -47,7 +47,7 @@ func readTxOut(r io.Reader, txo *wire.TxOut) error {
 		return err
 	}
 
-	tokenId, err := wire.ReadVarBytes(r, 0, 80, "tokenValue")
+	tokenId, err := wire.ReadVarBytes(r, 0, 80, "tokenId")
 	if err != nil {
 		return err
 	}

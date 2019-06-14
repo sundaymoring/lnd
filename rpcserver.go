@@ -1375,9 +1375,6 @@ func (r *rpcServer) OpenChannel(in *lnrpc.OpenChannelRequest,
 		fundingTime:	 uint32(time.Now().Unix()),
 	}
 
-	fmt.Printf("openChanReq: %+v\n", req)
-	fmt.Printf("openChanReq: %+v\n", req)
-
 	req.tokenId.SetBytes(tokenId[:])
 	updateChan, errChan := r.server.OpenChannel(req)
 
@@ -3067,9 +3064,10 @@ func extractPaymentIntent(rpcPayReq *rpcPaymentRequest) (rpcPaymentIntent, error
 		payIntent.routeHints = payReq.RouteHints
 
 		if payReq.TokenId != nil && payReq.TokenId.IsValid() {
+			payReq.TokenId.Reverse()
+
 			payIntent.tokenId = &wire.TokenId{}
 			payIntent.tokenId.SetBytes(payReq.TokenId[:])
-
 			if payReq.TokenMilliSat == nil {
 				if rpcPayReq.TokenAmt == 0 {
 					return payIntent, errors.New("token amount must be " +
@@ -3199,7 +3197,7 @@ func (r *rpcServer) dispatchPaymentIntent(
 			OutgoingChannelID: payIntent.outgoingChannelID,
 		}
 
-		if payIntent.tokenId.IsValid() {
+		if payIntent.tokenId != nil && payIntent.tokenId.IsValid() {
 			payment.TokenId.SetBytes(payIntent.tokenId[:])
 			payment.TokenAmount = payIntent.tokenMsat
 		}
@@ -3218,7 +3216,7 @@ func (r *rpcServer) dispatchPaymentIntent(
 			PaymentHash: payIntent.rHash,
 		}
 
-		if payIntent.tokenId.IsValid() {
+		if payIntent.tokenId != nil && payIntent.tokenId.IsValid() {
 			payment.TokenId.SetBytes(payIntent.tokenId[:])
 			payment.TokenAmount = payIntent.tokenMsat
 		}
@@ -3247,7 +3245,7 @@ func (r *rpcServer) dispatchPaymentIntent(
 		tokenAmt = payIntent.tokenMsat
 	}
 
-	if payIntent.tokenId.IsValid() {
+	if payIntent.tokenId != nil && payIntent.tokenId.IsValid() {
 		route.TokenId.SetBytes(payIntent.tokenId[:])
 	}
 
@@ -4282,8 +4280,11 @@ func (r *rpcServer) GetNodeInfo(ctx context.Context,
 //  * create separate PR to send based on well formatted route
 func (r *rpcServer) QueryRoutes(ctx context.Context,
 	in *lnrpc.QueryRoutesRequest) (*lnrpc.QueryRoutesResponse, error) {
-
-	return r.RouterBackend.QueryRoutes(ctx, in)
+		tokenId, err := r.GetTokenIdWithSymbol(in.Symbol)
+		if err != nil {
+			return nil, err
+		}
+	return r.RouterBackend.QueryRoutes(ctx, in, tokenId)
 }
 
 // unmarshallHopByChannelLookup unmarshalls an rpc hop for which the pub key is
@@ -4395,7 +4396,7 @@ func unmarshallRoute(rpcroute *lnrpc.Route,
 		rpcroute.TotalTimeLock,
 		sourceNode.PubKeyBytes,
 		hops,
-		tokenId, lnwire.MilliSatoshi(rpcroute.TotalTokenMsat),
+		tokenId, lnwire.MilliSatoshi(rpcroute.TotalTokenAmtMsat),
 	)
 	if err != nil {
 		return nil, err

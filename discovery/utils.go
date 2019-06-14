@@ -81,6 +81,11 @@ func CreateChanAnnouncement(chanProof *channeldb.ChannelAuthProof,
 			FeeRate:         uint32(e1.FeeProportionalMillionths),
 			ExtraOpaqueData: e1.ExtraOpaqueData,
 		}
+		if e1.TokenId.IsValid() {
+			edge1Ann.TokenId.SetBytes(e1.TokenId[:])
+			edge1Ann.HtlcMinimumTokenMsat = e1.TokenMinHTLC
+			edge1Ann.HtlcMaximumTokenMsat = e1.TokenMaxHTLC
+		}
 		edge1Ann.Signature, err = lnwire.NewSigFromRawSignature(e1.SigBytes)
 		if err != nil {
 			return nil, nil, nil, err
@@ -99,6 +104,11 @@ func CreateChanAnnouncement(chanProof *channeldb.ChannelAuthProof,
 			BaseFee:         uint32(e2.FeeBaseMSat),
 			FeeRate:         uint32(e2.FeeProportionalMillionths),
 			ExtraOpaqueData: e2.ExtraOpaqueData,
+		}
+		if e2.TokenId.IsValid() {
+			edge2Ann.TokenId.SetBytes(e2.TokenId[:])
+			edge2Ann.HtlcMinimumTokenMsat = e2.TokenMinHTLC
+			edge2Ann.HtlcMaximumTokenMsat = e2.TokenMaxHTLC
 		}
 		edge2Ann.Signature, err = lnwire.NewSigFromRawSignature(e2.SigBytes)
 		if err != nil {

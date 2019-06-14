@@ -2669,6 +2669,9 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	var confirmations int32
 	var value int64
 	var pkScript []byte
+
+	var tokenValue int64
+	var tokenId wire.TokenId
 	var isCoinbase bool
 	includeMempool := true
 	if c.IncludeMempool != nil {
@@ -2703,6 +2706,8 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		confirmations = 0
 		value = txOut.Value
 		pkScript = txOut.PkScript
+		tokenValue = txOut.TokenValue
+		tokenId = txOut.TokenId
 		isCoinbase = blockchain.IsCoinBaseTx(mtx)
 	} else {
 		out := wire.OutPoint{Hash: *txHash, Index: c.Vout}
@@ -2725,6 +2730,8 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		confirmations = 1 + best.Height - entry.BlockHeight()
 		value = entry.Amount()
 		pkScript = entry.PkScript()
+		tokenValue = entry.TokenAmount()
+		tokenId.SetBytes(entry.TokenId())
 		isCoinbase = entry.IsCoinBase()
 	}
 
@@ -2756,6 +2763,10 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		},
 		Coinbase: isCoinbase,
 	}
+
+	txOutReply.TokenId = make([]byte, len(tokenId))
+	copy(txOutReply.TokenId, tokenId[:])
+	txOutReply.TokenValue = btcutil.Amount(tokenValue).ToBTC()
 	return txOutReply, nil
 }
 

@@ -133,14 +133,12 @@ func (tokenId *TokenId) SetBytes(newTokenId []byte) error {
 	return nil
 }
 
-func (tokenId *TokenId) IsEqual(target *TokenId) bool {
-	if tokenId == nil && target == nil {
-		return true
+func (self TokenId) IsEqual(target *TokenId) bool {
+	if target == nil {
+		return !self.IsValid()
 	}
-	if tokenId == nil || target == nil {
-		return false
-	}
-	return *tokenId == *target
+
+	return self == *target
 }
 
 func (tokenId *TokenId) IsValid() bool {
@@ -152,6 +150,13 @@ func (tokenid TokenId) ToString() string {
 		tokenid[i], tokenid[TokenIdSize-1-i] = tokenid[TokenIdSize-1-i], tokenid[i]
 	}
 	return hex.EncodeToString(tokenid[:])
+}
+
+func (tokenid *TokenId) Reverse() *TokenId{
+	//for i := 0; i < TokenIdSize/2; i++ {
+	//	tokenid[i], tokenid[TokenIdSize-1-i] = tokenid[TokenIdSize-1-i], tokenid[i]
+	//}
+	return tokenid
 }
 
 func NewTokenIdFromStr(tokenid string) (*TokenId, error) {

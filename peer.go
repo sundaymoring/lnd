@@ -1755,6 +1755,7 @@ out:
 				TimeLockDelta: defaultPolicy.TimeLockDelta,
 			}
 
+
 			// Create the link and add it to the switch.
 			err = p.addLink(
 				chanPoint, lnChan, forwardingPolicy,

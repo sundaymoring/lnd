@@ -2,6 +2,7 @@ package autopilot
 
 import (
 	"bytes"
+	"github.com/btcsuite/btcd/wire"
 	"math/big"
 	"net"
 	"sync/atomic"
@@ -140,7 +141,7 @@ func (d *databaseChannelGraph) ForEachNode(cb func(Node) error) error {
 // meant to aide in the generation of random graphs for use within test cases
 // the exercise the autopilot package.
 func (d *databaseChannelGraph) addRandChannel(node1, node2 *btcec.PublicKey,
-	capacity btcutil.Amount) (*ChannelEdge, *ChannelEdge, error) {
+	capacity btcutil.Amount, tokenId *wire.TokenId, tokenCapacity btcutil.Amount) (*ChannelEdge, *ChannelEdge, error) {
 
 	fetchNode := func(pub *btcec.PublicKey) (*channeldb.LightningNode, error) {
 		if pub != nil {
@@ -217,6 +218,11 @@ func (d *databaseChannelGraph) addRandChannel(node1, node2 *btcec.PublicKey,
 		ChannelID: chanID.ToUint64(),
 		Capacity:  capacity,
 	}
+	if tokenId != nil && tokenId.IsValid() {
+		edge.TokenId.SetBytes(tokenId[:])
+		edge.CapacityToken = tokenCapacity
+	}
+
 	edge.AddNodeKeys(lnNode1, lnNode2, lnNode1, lnNode2)
 	if err := d.db.AddChannelEdge(edge); err != nil {
 		return nil, nil, err
@@ -233,7 +239,11 @@ func (d *databaseChannelGraph) addRandChannel(node1, node2 *btcec.PublicKey,
 		MessageFlags:              1,
 		ChannelFlags:              0,
 	}
-
+	if tokenId != nil && tokenId.IsValid() {
+		edgePolicy.TokenId.SetBytes(tokenId[:])
+		edgePolicy.TokenMinHTLC = 1
+		edgePolicy.TokenMaxHTLC = lnwire.NewMSatFromSatoshis(tokenCapacity)
+	}
 	if err := d.db.UpdateEdgePolicy(edgePolicy); err != nil {
 		return nil, nil, err
 	}
@@ -248,6 +258,11 @@ func (d *databaseChannelGraph) addRandChannel(node1, node2 *btcec.PublicKey,
 		FeeProportionalMillionths: 10000,
 		MessageFlags:              1,
 		ChannelFlags:              1,
+	}
+	if tokenId != nil && tokenId.IsValid() {
+		edgePolicy.TokenId.SetBytes(tokenId[:])
+		edgePolicy.TokenMinHTLC = 1
+		edgePolicy.TokenMaxHTLC = lnwire.NewMSatFromSatoshis(tokenCapacity)
 	}
 	if err := d.db.UpdateEdgePolicy(edgePolicy); err != nil {
 		return nil, nil, err

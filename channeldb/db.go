@@ -951,6 +951,10 @@ func (d *DB) RestoreChannelShells(channelShells ...*ChannelShell) error {
 				copy(edgeInfo.NodeKey1Bytes[:], chanPeer)
 				copy(edgeInfo.NodeKey2Bytes[:], selfNode.PubKeyBytes[:])
 			}
+			if channel.TokenId.IsValid() {
+				edgeInfo.TokenId.SetBytes(channel.TokenId[:])
+				edgeInfo.CapacityToken = channel.TokenCapacity
+			}
 
 			// With the edge info shell constructed, we'll now add
 			// it to the graph.
