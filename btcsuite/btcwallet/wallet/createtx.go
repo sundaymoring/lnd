@@ -38,22 +38,31 @@ func makeInputSource(eligible []wtxmgr.Credit) txauthor.InputSource {
 	currentTotalToken := btcutil.Amount(0)
 	currentInputs := make([]*wire.TxIn, 0, len(eligible))
 	currentScripts := make([][]byte, 0, len(eligible))
-	currentInputValues := make([]btcutil.Amount, 0, len(eligible))
+	currentInputValues := make([]txauthor.InputValue, 0, len(eligible))
 
 	return func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (btcutil.Amount, btcutil.Amount, []*wire.TxIn,
-		[]btcutil.Amount, [][]byte, error) {
+		[]txauthor.InputValue, [][]byte, error) {
 
-		for currentTotal < target && currentTotalToken < targetToken && len(eligible) != 0 {
+		for currentTotal < target && len(eligible) != 0 {
 			nextCredit := &eligible[0]
 			eligible = eligible[1:]
-			nextInput := wire.NewTxIn(&nextCredit.OutPoint, nil, nil)
-			currentTotal += nextCredit.Amount
-			if tokenId != nil && tokenId.IsValid() && tokenId.IsEqual(&nextCredit.TokenId) {
+
+			inputValue := txauthor.InputValue{Value: nextCredit.Amount}
+			if nextCredit.TokenId.IsValid() {
+				if tokenId == nil || !tokenId.IsValid() || !tokenId.IsEqual(&nextCredit.TokenId) {
+					continue
+				}
+				inputValue.TokenId.SetBytes(tokenId[:])
+				inputValue.TokenValue = nextCredit.TokenAmount
 				currentTotalToken += nextCredit.TokenAmount
 			}
+
+			nextInput := wire.NewTxIn(&nextCredit.OutPoint, nil, nil)
+			currentTotal += nextCredit.Amount
 			currentInputs = append(currentInputs, nextInput)
 			currentScripts = append(currentScripts, nextCredit.PkScript)
-			currentInputValues = append(currentInputValues, nextCredit.Amount)
+
+			currentInputValues = append(currentInputValues, inputValue)
 		}
 
 		return currentTotal, currentTotalToken, currentInputs, currentInputValues, currentScripts, nil
@@ -181,7 +190,7 @@ func (w *Wallet) txToOutputs(outputs []*wire.TxOut, account uint32,
 		return nil, err
 	}
 
-	err = validateMsgTx(tx.Tx, tx.PrevScripts, tx.PrevInputValues, tx.PrevInputTokenIds, tx.PrevInputTokenValues)
+	err = validateMsgTx(tx.Tx, tx.PrevScripts, tx.PrevInputValues)
 	if err != nil {
 		return nil, err
 	}
@@ -274,12 +283,12 @@ func (w *Wallet) findEligibleOutputs(dbtx walletdb.ReadTx, account uint32, minco
 // validateMsgTx verifies transaction input scripts for tx.  All previous output
 // scripts from outputs redeemed by the transaction, in the same order they are
 // spent, must be passed in the prevScripts slice.
-func validateMsgTx(tx *wire.MsgTx, prevScripts [][]byte, inputValues []btcutil.Amount,
-	inputTokenIds []*wire.TokenId, inputTokenValues []btcutil.Amount) error {
+func validateMsgTx(tx *wire.MsgTx, prevScripts [][]byte, inputValues []txauthor.InputValue,
+	) error {
 	hashCache := txscript.NewTxSigHashes(tx)
 	for i, prevScript := range prevScripts {
 		vm, err := txscript.NewEngine(prevScript, tx, i,
-			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i]), inputTokenIds[i][:], int64(inputTokenValues[i]))
+			txscript.StandardVerifyFlags, nil, hashCache, int64(inputValues[i].Value), inputValues[i].TokenId[:], int64(inputValues[i].TokenValue))
 		if err != nil {
 			return fmt.Errorf("cannot create script engine: %s", err)
 		}

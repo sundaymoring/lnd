@@ -24,7 +24,7 @@ import (
 // than the target or by returning a more detailed error implementing
 // InputSourceError.
 type InputSource func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (total, totalToken btcutil.Amount, inputs []*wire.TxIn,
-	inputValues []btcutil.Amount, scripts [][]byte, err error)
+	inputValues []InputValue, scripts [][]byte, err error)
 
 // InputSourceError describes the failure to provide enough input value from
 // unspent transaction outputs to meet a target amount.  A typed error is used
@@ -44,17 +44,21 @@ func (insufficientFundsError) Error() string {
 	return "insufficient funds available to construct transaction"
 }
 
+type InputValue struct {
+	Value 		btcutil.Amount
+	TokenId		wire.TokenId
+	TokenValue  btcutil.Amount
+}
+
 // AuthoredTx holds the state of a newly-created transaction and the change
 // output (if one was added).
 type AuthoredTx struct {
 	Tx              *wire.MsgTx
 	PrevScripts     [][]byte
-	PrevInputValues []btcutil.Amount
+	PrevInputValues []InputValue
 	TotalInput      btcutil.Amount
 	ChangeIndex     int // negative if no change
 
-	PrevInputTokenIds 	 []*wire.TokenId
-	PrevInputTokenValues []btcutil.Amount
 	TotalTokenInput      btcutil.Amount
 }
 
@@ -205,17 +209,15 @@ type SecretsSource interface {
 // are passed in prevPkScripts and the slice length must match the number of
 // inputs.  Private keys and redeem scripts are looked up using a SecretsSource
 // based on the previous output script.
-func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []btcutil.Amount,
-	secrets SecretsSource, inputTokenIds[]*wire.TokenId, inputTokenValues []btcutil.Amount) error {
+func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []InputValue,
+	secrets SecretsSource) error {
 
 	inputs := tx.TxIn
 	hashCache := txscript.NewTxSigHashes(tx)
 	chainParams := secrets.ChainParams()
 
 	if len(inputs) != len(prevPkScripts) ||
-		len(inputs) != len(inputValues) ||
-		len(inputs) != len(inputTokenIds) ||
-		len(inputs) != len(inputTokenValues) {
+		len(inputs) != len(inputValues) {
 		return errors.New("tx.TxIn and prevPkScripts slices must " +
 			"have equal length")
 	}
@@ -230,15 +232,15 @@ func AddAllInputScripts(tx *wire.MsgTx, prevPkScripts [][]byte, inputValues []bt
 		// script.
 		case txscript.IsPayToScriptHash(pkScript):
 			err := spendNestedWitnessPubKeyHash(inputs[i], pkScript,
-				int64(inputValues[i]), chainParams, secrets,
-				tx, hashCache, i, inputTokenIds[i], int64(inputTokenValues[i]))
+				int64(inputValues[i].Value), chainParams, secrets,
+				tx, hashCache, i, &inputValues[i].TokenId, int64(inputValues[i].TokenValue))
 			if err != nil {
 				return err
 			}
 		case txscript.IsPayToWitnessPubKeyHash(pkScript):
 			err := spendWitnessKeyHash(inputs[i], pkScript,
-				int64(inputValues[i]), chainParams, secrets,
-				tx, hashCache, i, inputTokenIds[i], int64(inputTokenValues[i]))
+				int64(inputValues[i].Value), chainParams, secrets,
+				tx, hashCache, i, &inputValues[i].TokenId, int64(inputValues[i].TokenValue))
 			if err != nil {
 				return err
 			}
@@ -389,5 +391,5 @@ func spendNestedWitnessPubKeyHash(txIn *wire.TxIn, pkScript []byte,
 // for each input of an authored transaction.  Private keys and redeem scripts
 // are looked up using a SecretsSource based on the previous output script.
 func (tx *AuthoredTx) AddAllInputScripts(secrets SecretsSource) error {
-	return AddAllInputScripts(tx.Tx, tx.PrevScripts, tx.PrevInputValues, secrets, tx.PrevInputTokenIds, tx.PrevInputTokenValues)
+	return AddAllInputScripts(tx.Tx, tx.PrevScripts, tx.PrevInputValues, secrets)
 }
