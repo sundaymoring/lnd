@@ -174,6 +174,14 @@ var sendCoinsCommand = cli.Command{
 			Name:  "amt",
 			Usage: "the number of bitcoin denominated in satoshis to send",
 		},
+		cli.StringFlag{
+			Name:  "symbol",
+			Usage: "the token to send",
+		},
+		cli.Int64Flag{
+			Name:  "tokenamt",
+			Usage: "the number of token denominated in satoshis to send",
+		},
 		cli.Int64Flag{
 			Name: "conf_target",
 			Usage: "(optional) the number of blocks that the " +
@@ -230,6 +238,22 @@ func sendCoins(ctx *cli.Context) error {
 		return fmt.Errorf("unable to decode amount: %v", err)
 	}
 
+	// token symbolt
+	var symbol string
+	var tokenAmt int64
+	if ctx.IsSet("symbol") {
+		symbol = ctx.String("symbol")
+		if symbol == "" {
+			return fmt.Errorf("token symbol cannot be empty")
+		}
+
+		if ctx.IsSet("tokenamt") {
+			tokenAmt = ctx.Int64("tokenamt")
+		} else {
+			return fmt.Errorf("token info incomplete")
+		}
+	}
+
 	if amt != 0 && ctx.Bool("sweepall") {
 		return fmt.Errorf("amount cannot be set if attempting to " +
 			"sweep all coins out of the wallet")
@@ -242,6 +266,8 @@ func sendCoins(ctx *cli.Context) error {
 	req := &lnrpc.SendCoinsRequest{
 		Addr:       addr,
 		Amount:     amt,
+		Symbol:		symbol,
+		TokenAmount:tokenAmt,
 		TargetConf: int32(ctx.Int64("conf_target")),
 		SatPerByte: ctx.Int64("sat_per_byte"),
 		SendAll:    ctx.Bool("sweepall"),

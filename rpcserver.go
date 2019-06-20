@@ -649,13 +649,18 @@ func (r *rpcServer) Stop() error {
 	return nil
 }
 
+type sendCoinUnit struct {
+	amt int64
+	tokenId *wire.TokenId
+	tokenAmt int64
+}
 // addrPairsToOutputs converts a map describing a set of outputs to be created,
 // the outputs themselves. The passed map pairs up an address, to a desired
 // output value amount. Each address is converted to its corresponding pkScript
 // to be used within the constructed output(s).
-func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
+func addrPairsToOutputs(addrPairs map[string]sendCoinUnit) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
-	for addr, amt := range addrPairs {
+	for addr, coinUnit := range addrPairs {
 		addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
 		if err != nil {
 			return nil, err
@@ -666,7 +671,11 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 			return nil, err
 		}
 
-		outputs = append(outputs, wire.NewTxOut(amt, pkscript))
+		txout := wire.NewTxOut(coinUnit.amt, pkscript)
+		txout.TokenId = *coinUnit.tokenId
+		txout.TokenValue = coinUnit.tokenAmt
+
+		outputs = append(outputs, txout)
 	}
 
 	return outputs, nil
@@ -675,14 +684,13 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 // sendCoinsOnChain makes an on-chain transaction in or to send coins to one or
 // more addresses specified in the passed payment map. The payment map maps an
 // address to a specified output value to be sent to that address.
-func (r *rpcServer) sendCoinsOnChain(paymentMap map[string]int64,
+func (r *rpcServer) sendCoinsOnChain(paymentMap map[string]sendCoinUnit,
 	feeRate lnwallet.SatPerKWeight) (*chainhash.Hash, error) {
-
+//HTODO outputs add token out info.   paymentMap need contain token value info
 	outputs, err := addrPairsToOutputs(paymentMap)
 	if err != nil {
 		return nil, err
 	}
-
 	tx, err := r.server.cc.wallet.SendOutputs(outputs, feeRate)
 	if err != nil {
 		return nil, err
@@ -890,8 +898,19 @@ func (r *rpcServer) SendCoins(ctx context.Context,
 		// coin selection synchronization method to ensure that no coin
 		// selection (funding, sweep alls, other sends) can proceed
 		// while we instruct the wallet to send this transaction.
-		paymentMap := map[string]int64{in.Addr: in.Amount}
-		err := wallet.WithCoinSelectLock(func() error {
+		tokenId, err := r.GetTokenIdWithSymbol(in.Symbol)
+		if err != nil {
+			return nil, fmt.Errorf("can not get tokenId with symbol: %v", err)
+		}
+		//paymentMap := map[string]int64{in.Addr: in.Amount}
+		paymentMap := map[string]sendCoinUnit{
+			in.Addr: sendCoinUnit{
+				amt: in.Amount,
+				tokenId: tokenId,
+				tokenAmt: in.TokenAmount,
+			},
+		}
+		err = wallet.WithCoinSelectLock(func() error {
 			newTXID, err := r.sendCoinsOnChain(paymentMap, feePerKw)
 			if err != nil {
 				return err
@@ -939,8 +958,15 @@ func (r *rpcServer) SendMany(ctx context.Context,
 	// happen to also be concurrently executing.
 	wallet := r.server.cc.wallet
 	err = wallet.WithCoinSelectLock(func() error {
+		var paymentMap map[string]sendCoinUnit = make(map[string]sendCoinUnit)
+		for k, v := range in.AddrToAmount {
+			paymentMap[k] = sendCoinUnit{
+				amt:v,
+			}
+		}
 		sendManyTXID, err := r.sendCoinsOnChain(
-			in.AddrToAmount, feePerKw,
+			//in.AddrToAmount, feePerKw,
+			paymentMap, feePerKw,
 		)
 		if err != nil {
 			return err

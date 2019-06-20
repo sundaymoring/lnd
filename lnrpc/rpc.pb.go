@@ -1544,7 +1544,7 @@ func (m *SendManyResponse) GetTxid() string {
 	}
 	return ""
 }
-
+//HTODO  add token amount
 type SendCoinsRequest struct {
 	// / The address to send coins to
 	Addr string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
@@ -1559,6 +1559,8 @@ type SendCoinsRequest struct {
 	// send all the coins under control of the internal wallet to the specified
 	// address.
 	SendAll              bool     `protobuf:"varint,6,opt,name=send_all,json=sendAll,proto3" json:"send_all,omitempty"`
+	Symbol 	string `protobuf:"bytes,7,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	TokenAmount int64 `protobuf:"varint,8,opt,name=amount,proto3" json:"amount,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
