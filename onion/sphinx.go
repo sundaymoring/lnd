@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/binary"
-	//"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
