@@ -127,12 +127,14 @@ func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 			continue
 		}
 
-		unsignedTransaction := &wire.MsgTx{
-			Version:  wire.TxVersion,
-			TxIn:     inputs,
-			TxOut:    outputs,
-			LockTime: 0,
+		unsignedTransaction := wire.NewMsgTx(wire.TxVersion)
+		if tokenId != nil && tokenId.IsValid() {
+			txscript.AddTokenSendTxout(unsignedTransaction, tokenId, int64(inputTokenAmount))
 		}
+		unsignedTransaction.LockTime = 0
+		unsignedTransaction.TxIn = inputs
+		unsignedTransaction.TxOut = append(unsignedTransaction.TxOut, outputs...)
+
 		changeIndex := -1
 		changeAmount := inputAmount - targetAmount - maxRequiredFee
 		changeTokenAmount := inputTokenAmount - targetTokenAmount
@@ -152,8 +154,8 @@ func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 				change.TokenId.SetBytes(tokenId[:])
 				change.TokenValue = int64(changeTokenAmount)
 			}
-			l := len(outputs)
-			unsignedTransaction.TxOut = append(outputs[:l:l], change)
+			l := len(unsignedTransaction.TxOut)
+			unsignedTransaction.TxOut = append(unsignedTransaction.TxOut[:l:l], change)
 			changeIndex = l
 		} else {
 			if tokenId.IsValid() && !(changeTokenAmount != 0 && !txrules.IsDustAmount(changeTokenAmount,
@@ -168,6 +170,7 @@ func NewUnsignedTransaction(outputs []*wire.TxOut, relayFeePerKb btcutil.Amount,
 			PrevInputValues: inputValues,
 			TotalInput:      inputAmount,
 			ChangeIndex:     changeIndex,
+			TotalTokenInput: inputTokenAmount,
 		}, nil
 	}
 }

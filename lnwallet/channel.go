@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
 	"sort"
 	"sync"
@@ -6345,7 +6344,7 @@ func CreateCommitTx(fundingOutput wire.TxIn,
 	commitTx.AddTxIn(&fundingOutput)
 
 	if tokenId != nil && tokenId.IsValid() {
-		AddTokenSendTxout(commitTx, tokenId, int64(amountToSelfToken + amountToThemToken))
+		txscript.AddTokenSendTxout(commitTx, tokenId, int64(amountToSelfToken + amountToThemToken))
 	}
 
 	// Avoid creating dust outputs within the commitment transaction.
@@ -6394,7 +6393,7 @@ func CreateCooperativeCloseTx(fundingTxIn wire.TxIn,
 	closeTx.AddTxIn(&fundingTxIn)
 
 	if tokenId != nil && tokenId.IsValid() {
-		AddTokenSendTxout(closeTx, tokenId, int64(ourTokenBalance + theirTokenBalance))
+		txscript.AddTokenSendTxout(closeTx, tokenId, int64(ourTokenBalance + theirTokenBalance))
 	}
 
 	// Create both cooperative closure outputs, properly respecting the
@@ -6543,41 +6542,3 @@ func (lc *LightningChannel) FwdMinHtlc() lnwire.MilliSatoshi {
 	return lc.localChanCfg.MinHTLC
 }
 
-func AddTokenSendTxout(tx *wire.MsgTx, tokenId *wire.TokenId, totalTokenAmount int64) error {
-	if tokenId != nil && tokenId.IsValid() && totalTokenAmount > 0 {
-
-		var scriptHeader [4]byte
-		scriptHeader[0] = 0xb8	// OP_TOKEN
-		scriptHeader[1] = 0x02	// HEADER LENGTH
-		scriptHeader[2] = 0x01	// TOKEN_PROTOCOL_VERSION
-		scriptHeader[3] = 0x02	// TTC_SEND
-
-		payload := bytes.NewBuffer(make([]byte, 0, 4 + 36 + 8))
-		if _, err := payload.Write(tokenId[:]); err != nil {
-			return err
-		}
-
-		var buf [8]byte
-		binary.LittleEndian.PutUint64(buf[:], uint64(totalTokenAmount))
-		if _, err := payload.Write(buf[:]); err != nil {
-			return err
-		}
-
-		//reverse := func (s []byte) []byte {
-		//	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		//		s[i], s[j] = s[j], s[i]
-		//	}
-		//	return s
-		//}
-		builder := txscript.NewScriptBuilder()
-		builder.AddOps(scriptHeader[:])
-		builder.AddData(payload.Bytes())
-
-		script, _ := builder.Script()
-		tx.AddTxOut(&wire.TxOut{
-			PkScript: script,
-			Value:  0})
-	}
-
-	return nil
-}

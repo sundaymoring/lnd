@@ -872,3 +872,42 @@ func IsUnspendable(pkScript []byte) bool {
 
 	return len(pops) > 0 && pops[0].opcode.value == OP_RETURN
 }
+
+func AddTokenSendTxout(tx *wire.MsgTx, tokenId *wire.TokenId, totalTokenAmount int64) error {
+	if tokenId != nil && tokenId.IsValid() && totalTokenAmount > 0 {
+
+		var scriptHeader [4]byte
+		scriptHeader[0] = 0xb8	// OP_TOKEN
+		scriptHeader[1] = 0x02	// HEADER LENGTH
+		scriptHeader[2] = 0x01	// TOKEN_PROTOCOL_VERSION
+		scriptHeader[3] = 0x02	// TTC_SEND
+
+		payload := bytes.NewBuffer(make([]byte, 0, 4 + 36 + 8))
+		if _, err := payload.Write(tokenId[:]); err != nil {
+			return err
+		}
+
+		var buf [8]byte
+		binary.LittleEndian.PutUint64(buf[:], uint64(totalTokenAmount))
+		if _, err := payload.Write(buf[:]); err != nil {
+			return err
+		}
+
+		//reverse := func (s []byte) []byte {
+		//	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		//		s[i], s[j] = s[j], s[i]
+		//	}
+		//	return s
+		//}
+		builder := NewScriptBuilder()
+		builder.AddOps(scriptHeader[:])
+		builder.AddData(payload.Bytes())
+
+		script, _ := builder.Script()
+		tx.AddTxOut(&wire.TxOut{
+			PkScript: script,
+			Value:  0})
+	}
+
+	return nil
+}

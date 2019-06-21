@@ -3,6 +3,7 @@ package lnwallet
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/btcsuite/btcd/txscript"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
@@ -60,7 +61,7 @@ func createHtlcSuccessTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	})
 
 	if tokenId != nil && tokenId.IsValid() {
-		AddTokenSendTxout(successTx, tokenId, int64(htlcTokenAmt))
+		txscript.AddTokenSendTxout(successTx, tokenId, int64(htlcTokenAmt))
 	}
 
 	// Next, we'll generate the script used as the output for all second
@@ -147,7 +148,7 @@ func createHtlcTimeoutTx(htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 		out.TokenId.SetBytes(tokenId[:])
 		out.TokenValue = int64(htlcTokenAmt)
 
-		AddTokenSendTxout(timeoutTx, tokenId, int64(htlcTokenAmt))
+		txscript.AddTokenSendTxout(timeoutTx, tokenId, int64(htlcTokenAmt))
 	}
 	timeoutTx.AddTxOut(out)
 

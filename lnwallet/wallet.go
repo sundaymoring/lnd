@@ -732,7 +732,7 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 
 	if pendingReservation.partialState.TokenId.IsValid() {
 		totalTokenAmt += int64(pendingReservation.partialState.TokenCapacity)
-		AddTokenSendTxout(fundingTx, &pendingReservation.partialState.TokenId,
+		txscript.AddTokenSendTxout(fundingTx, &pendingReservation.partialState.TokenId,
 			totalTokenAmt)
 	}
 

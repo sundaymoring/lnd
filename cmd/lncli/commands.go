@@ -240,17 +240,10 @@ func sendCoins(ctx *cli.Context) error {
 
 	// token symbolt
 	var symbol string
-	var tokenAmt int64
 	if ctx.IsSet("symbol") {
 		symbol = ctx.String("symbol")
 		if symbol == "" {
 			return fmt.Errorf("token symbol cannot be empty")
-		}
-
-		if ctx.IsSet("tokenamt") {
-			tokenAmt = ctx.Int64("tokenamt")
-		} else {
-			return fmt.Errorf("token info incomplete")
 		}
 	}
 
@@ -267,7 +260,6 @@ func sendCoins(ctx *cli.Context) error {
 		Addr:       addr,
 		Amount:     amt,
 		Symbol:		symbol,
-		TokenAmount:tokenAmt,
 		TargetConf: int32(ctx.Int64("conf_target")),
 		SatPerByte: ctx.Int64("sat_per_byte"),
 		SendAll:    ctx.Bool("sweepall"),

@@ -43,7 +43,7 @@ func makeInputSource(eligible []wtxmgr.Credit) txauthor.InputSource {
 	return func(target btcutil.Amount, tokenId *wire.TokenId, targetToken btcutil.Amount) (btcutil.Amount, btcutil.Amount, []*wire.TxIn,
 		[]txauthor.InputValue, [][]byte, error) {
 
-		for currentTotal < target && len(eligible) != 0 {
+		for (currentTotal < target || (tokenId == nil || currentTotalToken<targetToken))&& len(eligible) != 0 {
 			nextCredit := &eligible[0]
 			eligible = eligible[1:]
 

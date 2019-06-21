@@ -903,11 +903,19 @@ func (r *rpcServer) SendCoins(ctx context.Context,
 			return nil, fmt.Errorf("can not get tokenId with symbol: %v", err)
 		}
 		//paymentMap := map[string]int64{in.Addr: in.Amount}
+		var amt, tokenAmt int64
+		if *tokenId == wire.EmptyTokenId {
+			amt = in.Amount
+			tokenAmt = 0
+		} else {
+			amt = 100000
+			tokenAmt = in.Amount
+		}
 		paymentMap := map[string]sendCoinUnit{
 			in.Addr: sendCoinUnit{
-				amt: in.Amount,
+				amt: amt,
 				tokenId: tokenId,
-				tokenAmt: in.TokenAmount,
+				tokenAmt: tokenAmt,
 			},
 		}
 		err = wallet.WithCoinSelectLock(func() error {

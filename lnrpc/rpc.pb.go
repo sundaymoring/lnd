@@ -1560,7 +1560,7 @@ type SendCoinsRequest struct {
 	// address.
 	SendAll              bool     `protobuf:"varint,6,opt,name=send_all,json=sendAll,proto3" json:"send_all,omitempty"`
 	Symbol 	string `protobuf:"bytes,7,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	TokenAmount int64 `protobuf:"varint,8,opt,name=amount,proto3" json:"amount,omitempty"`
+	//TokenAmount int64 `protobuf:"varint,8,opt,name=amount,proto3" json:"amount,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
