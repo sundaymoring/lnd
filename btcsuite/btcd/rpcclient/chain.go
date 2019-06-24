@@ -954,3 +954,27 @@ func (c *Client)GetTokenInfo(symbol string) (*[]btcjson.GetTokenInfo, error) {
 	return c.GetTokenInfoAsyc(symbol).Receive()
 }
 
+// listtokeninfo
+type FutureListTokenInfoResult chan *response
+
+func (r FutureListTokenInfoResult) Receive() (*[]btcjson.ListTokenInfo, error){
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var tokenInfo []btcjson.ListTokenInfo
+	if err := json.Unmarshal(res, &tokenInfo); err != nil {
+		return nil, err
+	}
+	return &tokenInfo, nil
+}
+
+func (c *Client) ListTokenInfoAsyc() FutureListTokenInfoResult {
+	cmd := btcjson.NewListTokenInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+func (c *Client) ListTokenInfo()(*[]btcjson.ListTokenInfo, error) {
+	return c.ListTokenInfoAsyc().Receive()
+}

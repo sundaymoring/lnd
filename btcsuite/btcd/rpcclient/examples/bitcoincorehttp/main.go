@@ -39,4 +39,10 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("tokeninfo: %v", tokenInfo)
+
+	listTokeninfo, err := client.ListTokenInfo()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("listtokeninfo: %v", listTokeninfo)
 }

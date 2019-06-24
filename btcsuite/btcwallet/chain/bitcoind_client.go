@@ -1315,7 +1315,7 @@ func (c *BitcoindClient) GetTokenId(symbol string) (wire.TokenId, error)  {
 
 // HTODO implement function
 func (c *BitcoindClient) GetTokenSymbol(tokenId wire.TokenId) (string, error){
-	tokenInfo,err := c.chainConn.client.GetTokenInfo("")
+	tokenInfo,err := c.chainConn.client.ListTokenInfo()
 
 	if err != nil {
 		return "", err
@@ -1325,7 +1325,6 @@ func (c *BitcoindClient) GetTokenSymbol(tokenId wire.TokenId) (string, error){
 	if len(*tokenInfo) == 0 {
 		return "", errors.New("can not get token symbol of id: " + sTokenId)
 	}
-
 
 	for i := 0; i<len(*tokenInfo); i++ {
 		if (*tokenInfo)[i].Tokenid == sTokenId {

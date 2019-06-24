@@ -784,6 +784,13 @@ func NewGetTokenInfoCmd(symbol string) *GetTokenInfoCmd {
 	}
 }
 
+type ListTokenInfoCmd struct {
+}
+
+func NewListTokenInfoCmd() *ListTokenInfoCmd {
+	return &ListTokenInfoCmd{}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -837,4 +844,5 @@ func init() {
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettokeninfo", (*GetTokenInfoCmd)(nil), flags)
+	MustRegisterCmd("listtokeninfo", (*ListTokenInfoCmd)(nil), flags)
 }

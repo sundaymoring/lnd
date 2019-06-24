@@ -561,3 +561,11 @@ type GetTokenInfo struct {
 	Txid string `json:"txid"`
 	Tokenid string `json:"tokenid"`
 }
+
+type ListTokenInfo struct {
+	Symbol string `json:"symbol"`
+	Supply float64 `json:"supply"`
+	Address string `json:"address"`
+	Txid string `json:"txid"`
+	Tokenid string `json:"tokenid"`
+}
