@@ -1456,6 +1456,7 @@ type SendManyRequest struct {
 	TargetConf int32 `protobuf:"varint,3,opt,name=target_conf,json=targetConf,proto3" json:"target_conf,omitempty"`
 	// / A manual fee rate set in sat/byte that should be used when crafting the transaction.
 	SatPerByte           int64    `protobuf:"varint,5,opt,name=sat_per_byte,json=satPerByte,proto3" json:"sat_per_byte,omitempty"`
+	Symbol		string	`protobuf:"bytes,6,opt,name=symbol,proto3" json:"symbol,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

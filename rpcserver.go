@@ -966,10 +966,27 @@ func (r *rpcServer) SendMany(ctx context.Context,
 	// happen to also be concurrently executing.
 	wallet := r.server.cc.wallet
 	err = wallet.WithCoinSelectLock(func() error {
+
+
+		tokenId, err := r.GetTokenIdWithSymbol(in.Symbol)
+		if err != nil {
+			return err
+		}
+
 		var paymentMap map[string]sendCoinUnit = make(map[string]sendCoinUnit)
 		for k, v := range in.AddrToAmount {
-			paymentMap[k] = sendCoinUnit{
-				amt:v,
+			if *tokenId == wire.EmptyTokenId {
+				paymentMap[k] = sendCoinUnit{
+					amt:v,
+					tokenAmt: 0,
+					tokenId: tokenId,
+				}
+			} else {
+				paymentMap[k] = sendCoinUnit{
+					amt:100000,
+					tokenAmt: v,
+					tokenId: tokenId,
+				}
 			}
 		}
 		sendManyTXID, err := r.sendCoinsOnChain(

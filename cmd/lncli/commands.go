@@ -398,7 +398,7 @@ var sendManyCommand = cli.Command{
 	Name:      "sendmany",
 	Category:  "On-chain",
 	Usage:     "Send bitcoin on-chain to multiple addresses.",
-	ArgsUsage: "send-json-string [--conf_target=N] [--sat_per_byte=P]",
+	ArgsUsage: "symbol send-json-string [--conf_target=N] [--sat_per_byte=P]",
 	Description: `
 	Create and broadcast a transaction paying the specified amount(s) to the passed address(es).
 
@@ -425,7 +425,13 @@ var sendManyCommand = cli.Command{
 func sendMany(ctx *cli.Context) error {
 	var amountToAddr map[string]int64
 
-	jsonMap := ctx.Args().First()
+	var symbol string
+	args := ctx.Args()
+	if args.Present() {
+		symbol = args.First()
+	}
+	args = args.Tail()
+	jsonMap := args.First()
 	if err := json.Unmarshal([]byte(jsonMap), &amountToAddr); err != nil {
 		return err
 	}
@@ -441,6 +447,7 @@ func sendMany(ctx *cli.Context) error {
 
 	txid, err := client.SendMany(ctxb, &lnrpc.SendManyRequest{
 		AddrToAmount: amountToAddr,
+		Symbol:		  symbol,
 		TargetConf:   int32(ctx.Int64("conf_target")),
 		SatPerByte:   ctx.Int64("sat_per_byte"),
 	})
